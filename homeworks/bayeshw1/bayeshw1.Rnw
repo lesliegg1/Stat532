@@ -1,0 +1,274 @@
+\documentclass[12pt]{article}
+
+\usepackage{amssymb,amsmath}
+\usepackage{enumerate}
+\usepackage{float}
+\usepackage{verbatim}
+\usepackage{setspace}
+
+%% LaTeX margin settings:
+  \setlength{\textwidth}{7.0in}
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{-.5in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+
+%% tell knitr to use smaller font for code chunks
+\def\fs{\footnotesize}
+\def\R{{\sf R}}
+\newcommand{\bfbeta}{\mbox{\boldmath $\beta$}}
+\newcommand{\bfD}{\mbox{\boldmath $D$}}
+\newcommand{\bfL}{\mbox{\boldmath $L$}}
+\newcommand{\bfR}{\mbox{\boldmath $R$}}
+\newcommand{\bfmu}{\mbox{\boldmath $\mu$}}
+\newcommand{\bfv}{\mbox{\boldmath $V$}}
+\newcommand{\bfX}{\mbox{\boldmath $X$}}
+\newcommand{\bfy}{\mbox{\boldmath $y$}}
+\newcommand{\bfb}{\mbox{\boldmath $b$}}
+\begin{document}
+
+<<setup, include=FALSE, cache=FALSE>>=
+  opts_chunk$set(fig.width=5, fig.height=4, out.width='.5\\linewidth', dev='pdf', concordance=TRUE, size='footnotesize')
+options(replace.assign=TRUE,width=72, digits = 3, 
+        show.signif.stars = FALSE)
+
+
+samp.fun <- function(y){
+  ybar <- mean(y)
+  var <- var(y)
+  one <- mean(y)*1/2
+  two <- var(y)*1/2
+  vec <- list(ybar, var, one, two)
+  return(vec)
+}
+#samp.fun(c(102,154, 175))
+
+samp2.fun <- function(x){
+  x.vec <- 8*mean(x)
+  return(x.vec)
+}
+@
+  
+  
+\begin{center}
+\large{Bayes: Homework $1$} \\
+Leslie Gains-Germain
+\end{center}
+
+\begin{doublespacing}
+
+\begin{enumerate}
+
+\item The \verb+dhyper(x, m, n, k, log = FALSE)+ function gives the probability of drawing $X=x$ white balls without replacement from $k$ draws out of an urn with $m$ white balls and $n$ black balls.
+
+\item My function is below. The default value for $x$ is $1$.
+
+<<hyperfun, echo=TRUE>>=
+hyper.fun <- function(theta, x=1) {
+  choose(theta, x) * choose((12-theta), (5-x)) / choose(12, 5)
+}
+hyper.fun(0.1)
+@
+
+\item 
+
+<<apply, echo=TRUE>>=
+theta.vec <- matrix(0:12)
+nice.table <- matrix(NA, nrow=13, ncol=6)
+for(i in 1:6){
+  nice.table[,i] <- apply(theta.vec, 1, hyper.fun, x=i-1)
+}
+@
+
+\item 
+
+<<sum, echo=TRUE>>=
+col.sums <- apply(nice.table, 2, sum)
+col.sums
+row.sums <- apply(nice.table, 1, sum)
+row.sums
+@
+
+The rows sum to one because for a given a value of theta, each row describes the probability of drawing $x$ gold marbles. When we sum over the entire support, $0$ to $5$, we get $1$ because the probability that some event in the sample space occurs is $1$. When we sum across the columns, we are summing over the likelihood of different values of theta given $x$ is fixed. These do not sum to $1$ because the likelihood function is not a probability mass function.
+
+\item Given a fixed $x$, $\theta$ is the independent variable, and the likelihood function, $L(\theta|x)$ is simply a function of $\theta$. It is not a probability mass function because it does not describe the probabilities for a set of possible outcomes of a random event. Instead, it is a function that describes the likelihood for possible values of $\theta$ given the random event has occurred and $x$ has been observed. We usually use the notation $f(x|\theta)$ for a probability mass function and $L(\theta|x)$ for a likelihood function.
+
+\item We often use the maximum likelihood principle to estimate $\theta$. We look at the values of the likelihood function across the possible values of $\theta$, and we choose the $\theta$ that maximizes the likelihood function (given $X=x$ has been observed). The value of $\theta$ that maximizes the likelihood function is our best guess for the true value of $\theta$. 
+
+\item An estimator is a random variable defined prior to data collection. For example, $\bar{X}$ is a common estimator, it is a function of the data before the data have been observed. An estimate is a realization of the estimator and is calculated after the data are observed. For example, $\bar{x}$ is a point estimate for a population mean, and it is calculated with observed data $x_1, x_2,.., x_n$.
+
+\item The maximum likelihood estimator could be $0, 2, 5, 7, 10$, or $12$. I found these by looking at the above table, and they correspond to the $6$ possible values of X as in the following table. For example, if we draw $X=1$, then the likelihood function is maximized at $\hat{\theta}=2$.
+
+\begin{table} [H]
+\centering
+\begin{tabular}{c c}
+X & $\hat{\theta}$ \\
+\hline
+0 & 0 \\
+1 & 2 \\
+2 & 5 \\
+3 & 7 \\
+4 & 10 \\
+5 & 12 \\
+\hline
+\end{tabular}
+\end{table}
+
+\item Since we are drawing $5$ marbles out of the bucket (with a total of $12$ marbles), there are $792$ possible samples that could be drawn. I'm going to suppose the true value of $\theta$ is $7$, and simulate $500$ samples. For each sample, I will find the maximum likelihood estimate and build a histogram to give you an idea of what the sampling distribution of ML estimates would look like. \\
+
+Here's an approximate sampling distribution of maximum likelihood {\it estimates} constructed with $500$ simulations. It is centered at the true number of gold balls, $7$, and the MLE's farther from $7$ are less likely to occur.
+
+<<sim, echo=TRUE, message=FALSE>>=
+set.seed(5)
+sims <- rhyper(500, 7, 5, 5)
+mles <- ifelse(sims==0, 0, 
+               ifelse(sims==1, 2, 
+                      ifelse(sims==2, 5, 
+                             ifelse(sims==3, 7, 
+                                    ifelse(sims==4, 10, 
+                                           ifelse(sims==5, 12, 0))))))
+require(mosaic)
+dotPlot(mles, main="Approx Sampling Distribution of MLES if theta=7", cex=2, pch=5)
+@
+
+I think that the best way to display the sampling distribution of the maximum likelihood {\it estimator} is through a table. We would essentially just take the table that we used to describe the likelihood function previously, and list the possible values for the ML estimator at the top. For each true value of $\theta$, the long run relative frequencies of each possible value of the ML estimator are shown in the rows of the table.
+
+<<mlestimator, message=FALSE, results='asis', echo=FALSE>>=
+nice.table <- data.frame(nice.table)
+names(nice.table) <- c("0", "2", "5", "7", "10", "12")
+row.names(nice.table) <- 0:12
+require(xtable)
+xtable(nice.table)
+@
+
+
+\item \begin{enumerate} \item The maximum likelihood estimate is $2$. 
+
+\item Given $x$ is $1$, this plot shows the values of the likelihood function over the range of possible values of $\theta$. You can clearly see that the maximum likelihood estimate is $2$. A histogram wouldn't make sense here. I {\it think} it would show you how many likelihoods were in each 'bin', and the largest bin would be the $0$ to $0.1$ bin because there are so many zeros. This is not useful information at all. 
+
+<<lfun, echo=TRUE>>=
+plot(0:12, nice.table[,2], xlab="theta", ylab="likelihood given x=1")
+@
+
+\item The normalized likelihood function is just a rescaled version of the likelihood function so that the likelihood sums to $1$ over all possible $\theta$ values.
+
+<<norm, echo=TRUE>>=
+plot(0:12, nice.table[,2]/sum(nice.table[,2]), xlab="theta", ylab="normalized likelihood")
+@
+
+
+\end{enumerate}
+
+\item \begin{enumerate}
+
+\item Consider the simple linear regression model: \\
+
+$y_i = \beta_0 + \beta_1x_i + e_i$ \\
+
+I simulated data to investigate this problem.
+
+<<sim2, echo=TRUE>>=
+x <- 1:20
+y <- 3 + 2*x + rnorm(20,0,5)
+data.sim <- data.frame(cbind(x,y))
+plot(x,y)
+lm.fit <- lm(y ~ x, data = data.sim)
+coef(lm.fit)
+
+glm.fit <- glm(y ~ x, data = data.sim, family = "gaussian")
+coef(lm.fit)
+@
+
+
+The \verb+lm()+ procedure finds the ordinary least squares estimates for $\beta_0$ and $\beta_1$ by minimizing the sum of squared residuals. The distributional assumption is that $\epsilon_i \sim (0, \sigma^2)$. Note that the assumption for normality is not actually needed to calculate the OLS estimates - the assumption of normality is only made in order to calculate p-values and confidence intervals. \\
+
+In the \verb+glm()+ procedure, we specify \verb+family="gaussian"+ and an identity link function, so the distributional assumption is: $\epsilon_i \sim N(0, \sigma^2)$. The default procedure used to find the estimates in \verb+glm()+ is maximum likelihood estimation, and it does this using iteratively reweighted least squares. Because we are assuming normally distributed errors, the maximum likelihood estimate is the same as the ordinary least squares estimate from \verb+lm+.
+
+\item The \verb+lm+ procedure gives t-based confidence intervals when the \verb+confint+ function is used. It calculates these intervals by adding and subtracting from the estimates the standard error multiplied by the t multiplier. \\
+
+The \verb+glm+ procedure gives likelihood based confidence intervals. It finds these by plotting the likelihood over the entire parameter space, and then it finds the $2.5$th and $97.5$th percentiles from the likelihood function. I think it looks at the marginal likelihood function separately for each parameter to do this?
+
+<<confint, echo=TRUE>>=
+confint(lm.fit)
+confint(glm.fit)
+@
+
+\end{enumerate}
+
+\item This is how I think of Bayes Theorem:
+\begin{align*}
+f(\theta|x) &= \frac{f(x|\theta)*f(\theta)}{f(x)}
+\end{align*}
+
+A lot of books use p`s for probability mass functions. In the bucket problem, both $X$ and $\theta$ are discrete random variables, so the notation I would use for this problem is as follows.
+
+\begin{align*}
+p(\theta|x) &= \frac{p(x|\theta)*p(\theta)}{p(x)}
+\end{align*}
+
+\item In the bucket problem, we replace $p(x|\theta)$ with the likelihood function, $L(\theta|x)$, which we know to be a hypergeometric distribution. The marginal distribution in the denominator is found by finding the joint distribution of $x$ and $\theta$ and then summing over all values of $\theta$.
+
+\begin{align*}
+p(\theta|x) &= \frac{p(x|\theta)*p(\theta)}{p(x)} \\
+            &= \frac{L(\theta|x)*p(\theta)}{\sum_{\theta \in \Theta} L(\theta|x)*p(\theta)} = \frac{\frac{{\theta \choose x} {12-\theta \choose 5-x}} {{12 \choose 5}} * p(\theta)} {\sum_{\theta=0}^{\theta=12} \frac{{\theta \choose x} {1-\theta \choose 5-x}} {{12 \choose 5}} * p(\theta)}
+\end{align*}
+
+\item \begin{enumerate}
+
+\item
+<<thetatable, echo=TRUE>>=
+theta <- 0:12
+priors <- c(0, 0, 1/36, 2/36, 3/36, 4/36, 5/36, 6/36, 5/36, 4/36, 3/36, 2/36, 1/36)
+likelihood <- apply(theta.vec, 1, hyper.fun, x = 1)
+product <- likelihood*priors
+posterior <- likelihood*priors/sum(product)
+dice.sum <- cbind(theta, priors, likelihood, product, posterior)
+dice.sum
+@
+
+\item 
+<<priors2, echo=TRUE>>=
+priors2 <- c(0, 1/6, 1/6, 1/6, 1/6, 1/6, 1/6, 0, 0, 0, 0, 0, 0)
+product2 <- likelihood*priors2
+posterior2 <- likelihood*priors2/sum(product2)
+dice.one <- cbind(theta, priors2, likelihood, product2, posterior2)
+dice.one
+@
+
+\item 
+<<priors3, echo=TRUE>>=
+priors3 <- dbinom(0:12, 12, 1/2)
+product3 <- likelihood*priors3
+posterior3 <- likelihood*priors3/sum(product3)
+coin.flip <- cbind(theta, priors3, likelihood, product3, posterior3)
+coin.flip
+@
+
+\end{enumerate}
+
+\item Yes, they do make sense. We can see that across all posterior functions, if either the likelihood or the prior probability was $0$ for a given value of $\theta$, then the posterior probability is $0$ for that value of $\theta$ as well. It also makes sense that the one die prior gives a higher posterior probability for the lower values of $\theta$ ($1$ and $2$) compared to the other two priors that give higher posteriors probabilities for the higher values of $\theta$ ($5$, and $6$). I think the one die prior is the least informative because it yields a prior that looks closest to the likelihood function. The posterior distribution differs from the likelihood much more when the other two priors are used. It is surprising to me how much the choice of prior can affect the posterior distribution.
+
+
+<<plotsss, echo=FALSE>>=
+plot(theta, posterior, ylim=c(0,0.4))
+points(theta, posterior2, col="red", pch=4)
+points(theta, posterior3, col="blue", pch=2)
+@
+
+\item This confirms what I speculated on in the previous problem. The one die prior matches up closest to the normalized likelihood function. This is because this prior is the least informative - it just puts a discrete uniform distribution values of $\theta$ between $1$ and $6$. This allows the likelihood to take the primary role in shaping the posterior distribution.
+
+<<plotnormpost, echo=FALSE>>=
+plot(0:12, nice.table[,2]/sum(nice.table[,2]), xlab="theta", ylab="normalized likelihood", ylim=c(0,0.4))
+points(theta, posterior, col="green", pch=8)
+points(theta, posterior2, col="red", pch=4)
+points(theta, posterior3, col="blue", pch=2)
+@
+
+\item See attached.
+
+
+\end{enumerate}
+
+\end{doublespacing}
+
+\end{document}

@@ -1,0 +1,19 @@
+
+model
+{
+for(i in 1:N)
+{
+logit(pi[i]) <- phi[i]
+y[i] ~ dbin(pi[i], n[i])
+phi[i] ~ dnorm(mu, tau)
+}
+
+mu ~ dnorm(mu.0, K.0*tau)
+tau ~ dgamma(a.0, b.0)
+sigmasq <- pow(tau, -1)
+
+a.0 <- .01
+b.0 <- .01
+K.0 <- 2
+mu.0 <- -10 
+}

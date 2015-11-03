@@ -1,0 +1,1261 @@
+\documentclass[12pt]{article}
+
+\usepackage{amssymb,amsmath}
+\usepackage{enumerate}
+\usepackage{float}
+\usepackage{verbatim}
+\usepackage{setspace}
+\usepackage{graphicx, multicol}
+
+%% LaTeX margin settings:
+  \setlength{\textwidth}{7.0in}
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{-.5in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+
+%% tell knitr to use smaller font for code chunks
+\def\fs{\footnotesize}
+\def\R{{\sf R}}
+\newcommand{\bfbeta}{\mbox{\boldmath $\beta$}}
+\newcommand{\bfD}{\mbox{\boldmath $D$}}
+\newcommand{\bfL}{\mbox{\boldmath $L$}}
+\newcommand{\bfR}{\mbox{\boldmath $R$}}
+\newcommand{\bfmu}{\mbox{\boldmath $\mu$}}
+\newcommand{\bfv}{\mbox{\boldmath $V$}}
+\newcommand{\bfX}{\mbox{\boldmath $X$}}
+\newcommand{\bfy}{\mbox{\boldmath $y$}}
+\newcommand{\bfb}{\mbox{\boldmath $b$}}
+\begin{document}
+
+<<setup, include=FALSE, cache=FALSE>>=
+  opts_chunk$set(fig.width=5, fig.height=4, out.width='.5\\linewidth', dev='pdf', concordance=TRUE, size='footnotesize')
+options(replace.assign=TRUE,width=72, digits = 3, 
+        show.signif.stars = FALSE)
+@
+  
+  
+\begin{center}
+\large{Bayes: Homework $8$} \\
+Leslie Gains-Germain
+\end{center}
+
+\begin{doublespacing}
+
+\begin{enumerate}
+
+\item \begin{enumerate}
+
+\item I modified the logit-normal code to draw candidate values for $\phi_j$ (rather than $\pi_j$) from a normal distribution centered at the current value of $\phi_j$. I only printed the function that draws from the complete conditional distribution for $\phi_j$ because most of the rest of the code is the same as the tutorial (see appendix). Below, I show the histogram of draws for the complete conditional distribution for $\phi_1$ to test the function. You can see the histogram of draws looks similar to the curve found by grid approximation. 
+\begin{singlespace}
+<<data, echo=FALSE>>=
+  #### Applied problem  (Tsutakawa et al. 1985) - Estimate rate of death from
+  ## stomach cancer for at risk males between ages 45-64 for the largest cities in 
+  ## Missouri.  Here are the mortality rates for 20 of the cities
+  ##  (number at risk (nj), number of cancer deaths (yj))
+  
+  nj.vec <- c(1083,855,3461,657,1208,1025, 527, 1668, 583, 582, 917, 857, 680, 917, 53637,
+               874, 395, 581, 588, 383)
+  yj.vec <- c(0,0,2,0,1,1,0,2,1,3,0,1,1,1,54,0,0,1,3,0)
+@
+\end{singlespace}
+
+<<gibbsalg, echo=FALSE, message=FALSE>>=
+
+expit <- function(x) {exp(x)/(1+exp(x))}
+logit <- function(x) { log(x/(1-x))}
+
+# define values from stomach cancer data
+set.seed(459)
+n <- length(nj.vec)
+m <- nj.vec
+require(arm)
+phi.data <- rnorm(10, mean=0.2, sd=1)
+y.data <- yj.vec
+@
+
+\begin{singlespace}
+<<jagsmodelbetabinominit, include=FALSE>>=
+##write model file first
+cat("
+model
+{
+for(i in 1:N)
+{
+y[i] ~ dbin(pi[i], n[i])
+pi[i] ~ dbeta(a.0, b.0)
+}
+a.0 <- kappa*eta
+b.0 <- kappa*(1-eta)
+
+eta ~ dbeta(.5, .5)
+kappa ~ dgamma(2, 1.5)
+}",
+file="jags-betabinomial.jags")
+@
+\end{singlespace}
+
+\begin{singlespace}
+<<jagscallbetabininit, include=FALSE, results='hide', message=FALSE, cache=TRUE>>=
+##jags call
+library(R2jags)
+set.seed(52)
+
+stomach.data <- list(N=length(y.data), y=y.data, n=m)
+
+inits <- list(list(pi=seq(0.0001, 0.2, length=20), eta = .00003, kappa = .7), 
+              list(pi=seq(0.2, 0.0001, length=20), eta = .2, kappa = 3), 
+              list(pi=c(seq(0.1, 0.2, length=10), seq(0.0001, 0.1, length=10)), 
+                        eta = .03, kappa = .1))
+n.chain <- 3
+
+#warmup
+warmup.betabinom <- jags.model("jags-betabinomial.jags", data=stomach.data, n.chains=n.chain, inits=inits, n.adapt=3000, quiet=TRUE)
+
+#parameters to save
+params <- c("pi", "eta", "kappa")
+
+n.iter=10000
+#running the model for real
+betabinom <- coda.samples(warmup.betabinom, params, n.iter=n.iter)
+@
+\end{singlespace}
+
+
+<<cc, echo=FALSE>>=
+##########################################################
+## Write functions to sample from complete conditional ###
+##  distributions                                      ###
+##########################################################
+
+
+## Complete conditional for precision of phi: phi ~ N(mu,prec=tau) where
+##  p(tau) = Gamma(a.0, b.0)
+draw.cc.tau <- function(mu, phi.vec, a.0, b.0, mu.0, K.0=1) {
+                 n <- length(phi.vec)
+                 a.gamma <- a.0 + ((n+1)/2)
+                 b.gamma <- b.0 + ((1/2)*sum((phi.vec - mu)^2)) + 
+                   ((K.0/2)*((mu - mu.0)^2))
+                 rgamma(1, a.gamma, b.gamma)
+                 }
+
+#draw.cc.tau(0, phi.data, a.0=0.001, b.0=0.001, mu.0=0)
+
+
+## Complete conditional for mu: phi ~ N(mu,prec=tau), where
+##  mu|tau ~ Normal(mu.0, prec=(K.0*tau)
+
+draw.cc.mu <- function(tau, phi.vec, mu.0, K.0=1) {
+                 n <- length(phi.vec)
+                 cc.mean <- ((n/(n+K.0))*mean(phi.vec)) + ((K.0/(n+K.0))*mu.0)
+                 cc.sd <- sqrt(1/(tau*(K.0+n)))
+                 rnorm(1, cc.mean, cc.sd)
+  }
+
+#draw.cc.mu(1.5,phi.data,mu.0=0, K.0=1)
+
+
+## Complete conditional distribution for phi's
+
+phi.cc <- function(phi.i, y.i, m, mu, tau) {
+           (expit(phi.i)^(y.i))*((1-expit(phi.i))^(m-y.i))*exp((-tau/2)*((phi.i-mu)^2))
+  }
+#phi.cc(phi.data[1], y.data[1], m=m[1], 0, 1)
+#log(phi.cc(phi.data[1], y.data[1], 0, 1))
+
+
+log.phi.cc <- function(phi.i, y.i, m, mu, tau) {
+               y.i*log(expit(phi.i)) + (m-y.i)*log(1-expit(phi.i)) - ((tau/2)*((phi.i-mu)^2))
+           }
+#log.phi.cc(phi.data[1], y.data[1], m=m[1], 0, 1)
+
+  ### Now what?  We can use Metropolis-Hastings or Rejection
+
+
+    #find normalizing constant computationally using numerical integration
+    ## We do not NEED to do this for this problem, but this is an example
+    ## to refresh how we could get it for this complete conditional distribution
+    ## and it allows us to easily check our Rejection and M-H algorithms
+      phi.grid <- seq(-8,-3,length=1000)
+      un.phi.dens <- apply(cbind(phi.grid), 1, phi.cc, y=y.data[1], m=m[1], mu=0, tau=1)
+      step.size <- phi.grid[2] - phi.grid[1]
+      nc <- sum(un.phi.dens*step.size)
+      cc.phi.dens <- un.phi.dens/nc
+@
+
+\begin{center}
+\begin{singlespace}
+<<testccdraw, echo=TRUE, out.width="0.5\\linewidth">>=
+ #### function that uses metropolis hastings to draw from complete conditional for phi_j
+    MH.draw.cc.phi <- function(phi.cur, tuning, y.i, m, mu, tau){
+     phi.cand <- rnorm(1, phi.cur, tuning)
+     r.num.lcc <- y.i*log(expit(phi.cand)) + (m-y.i)*log(1-expit(phi.cand))+
+                      dnorm(phi.cand, mu, sqrt(1/tau), log = TRUE)
+     r.denom.lcc <- y.i*log(expit(phi.cur)) + (m-y.i)*log(1-expit(phi.cur))+
+                      dnorm(phi.cur, mu, sqrt(1/tau), log = TRUE )
+     r.num.ljump <- dnorm(phi.cur, phi.cand, tuning, log = TRUE)
+     r.denom.ljump <- dnorm(phi.cand, phi.cur, tuning, log = TRUE)
+  
+     logr <- r.num.lcc + r.num.ljump - r.denom.lcc - r.denom.ljump
+     ind.jump <- ifelse(runif(1) < exp(logr), 1, 0)
+     phi.cur <- ifelse(ind.jump==1, phi.cand, phi.cur)
+     return(c(phi.cur, ind.jump))
+    }
+
+#MH.draw.cc.phi(phi.cur=0, tuning=.8, y.i=0, m=917, mu=0, tau=1)
+
+   #check M-H  
+     n.MH <- 1000
+     MH.test.draws <- numeric(n.MH)
+     MH.test.draws[1] <- -5
+     for (k in 2:n.MH) {
+         MH.test.draws[k] <- MH.draw.cc.phi(MH.test.draws[k-1], tuning=.8, 
+                                       y.i=y.data[1], m=m[1], mu=0, tau=1)[1]
+       }
+     hist(MH.test.draws, nclass=50, freq=FALSE, col=gray(0.9))
+     lines(phi.grid, cc.phi.dens, col=3, lwd=2)
+@
+\end{singlespace}
+\end{center}
+
+We are assuming that $\phi_i \sim N(\mu, \frac{1}{\tau})$. The prior on $\tau$ is $Gam(a_0, b_0)$. The prior on $\mu|\tau$ is $N(\mu_0, \frac{1}{\kappa_0\tau})$. For the hyperparameter values, I chose $\mu_0=-10$. I chose this value because Allison, Claire, and I looked online for the rate of death due to stomach cancer, and I found on worldlifexpectancy.com that the rate of death of stomach cancer in the US is $2.81/10000$. This equals $-10.45$ on the logit scale, so it seemed reasonable to center the prior for $\mu$ at $-10$. I chose $\kappa_0=2$. I was thinking of $\kappa_0$ as the number of prior observations, so I figured I would choose a larger value of $\kappa_0$ if I wanted the prior to be more informative. I chose $2$ because with a sample size of $20$, the prior would be about $1/10$th as informative as the data. \\
+
+At first, I tried to specify a weakly informative prior for $\tau$. I looked at the spread of stomach cancer death rates around the world, and I tried to use this information to think about what reasonable spreads would be for death rates among the counties in Missouri. But then, I started thinking about that maybe the spread of death rates due to stomach cancer among the world's countries aren't representative of the spread of death rates among Missouri's counties. In the end, I realized that I actually don't have much prior knowledge about what the spread of death rates should be among the counties in Missouri. Who knows? Maybe there is a stomach cancer epidemic in Missouri! As a result, I decided to use a non-informative $Gam(0.01, 0.01)$ prior for $\tau$. 
+
+%I chose $a_0=1.5, b_0=0.3$. The $Gam(1.5, 0.3)$ distribution is plotted below.  Around the world, the rate of death due to stomach cancer seems to vary from about $-8.5$ to $-11.5$ on the logit scale (from about $0.00001$ to $0.0002$ on the probability scale). I consider standard deviations between $3$ and $0.05$ to be plausible, and I expect the most likely standard deviation to be around $0.5$ on the logit scale. This means that I want a prior for the precision that allows for values between $0.1$ and $20$, and the most likely value is around $2$. The $Gam(1.5, 0.3)$ distribution satisfies these specifications.
+
+\begin{center}
+<<hyperparams, echo=FALSE, eval=FALSE>>=
+x <- seq(0, 20, by=0.01)
+plot(x, dgamma(x, shape=1.5, rate=.3), type="l")
+@
+\end{center}
+
+<<gibbs, echo=FALSE, cache=TRUE>>=
+#####################################################
+### Now set up the actual Gibbs sampling algorithm ##
+#####################################################
+
+##1. Set values for hyperparameters
+## More thought should be put into these in real life!
+a.0 <- .01
+b.0 <- .01
+K.0 <- 2
+mu.0 <- -10
+
+##2. Set up vectors and matrices to store results in
+n.gibbs <- 30050
+mu.vec <- numeric(n.gibbs)
+tau.vec <- numeric(n.gibbs)
+phi.mat <- matrix(nrow=n.gibbs, ncol=length(y.data))
+jump.vec <- numeric(n.gibbs-1)
+
+##3. Set initial values
+mu.vec[1] <- 2  #initial value for mu
+tau.vec[1] <- 0.5  #initial value for tau
+phi.mat[1,] <- rep(0,length(y.data)) #logit(0.5)=0
+
+##4. NOW Set up the d steps for each iteration ##
+
+for (t in 2:n.gibbs) {
+  
+ #(a) Update tau
+ tau.vec[t] <- draw.cc.tau(mu.vec[t-1], phi.mat[t-1,], a.0=a.0, b.0=b.0, mu.0=mu.0, K.0=K.0)
+
+ #(b) Update mu
+ mu.vec[t] <- draw.cc.mu(tau.vec[t], phi.mat[t-1,], mu.0=mu.0, K.0=K.0)
+
+ #(c) Update the vector of phi's
+
+ ### M-H version  ####
+  for (j in 1:length(y.data)) {
+    draw.and.jump <- MH.draw.cc.phi(phi.mat[t-1,j], tuning=4, y.i=y.data[j], m=m[j], mu=mu.vec[t], tau=tau.vec[t])
+    phi.mat[t,j] <- draw.and.jump[1]
+    jump.vec[t-1] <- draw.and.jump[2]
+   }
+  }
+
+#mean(jump.vec)
+#jump.vec[1:10]
+@
+
+$30050$ iterations were run, and the traceplots are shown below for parameters $\mu, \tau, \phi_1, \phi_2$, and $\phi_3$. Convergence looks good (I also checked the traceplots for all $20 \phi$'s). It looks like a small burn-in period of $50$ iterations will be adequate for all parameters.
+
+<<traceplotsmutau, echo=FALSE, out.width="\\linewidth", fig.height=6>>=
+par(mfrow=c(3,1))
+plot(1:n.gibbs, mu.vec, type="n", main=expression(mu), ylab=expression(mu),  xlab="iteration")
+  lines(1:n.gibbs, mu.vec, col="red")
+    abline(h=mean(mu.vec), lwd=2, col=2)  #posterior mean
+    abline(h=mean(logit(y.data/m)), lwd=2, col=4) #logit of average of observed proportions
+
+plot(1:n.gibbs, tau.vec, type="n", main=expression(tau), ylab=expression(tau),  xlab="iteration")
+  lines(1:n.gibbs, tau.vec, col="red")
+    abline(h=mean(tau.vec), lwd=2, col=2)  #posterior mean
+    abline(h=1/var(logit(y.data/m)), lwd=2, col=4)
+@
+
+<<traceplotsd, echo=FALSE, eval=FALSE>>=
+#SD scale, instead of precision or variance
+plot(1:n.gibbs, sqrt(1/tau.vec), type="n", main=expression(sqrt(1/tau)), ylab=expression(sqrt(1/tau)),  xlab="iteration")
+  lines(1:n.gibbs, sqrt(1/tau.vec), col="red")
+    abline(h=1, lwd=3, col="darkgreen") #true tau
+    abline(h=sqrt(1/mean(tau.vec)), lwd=2, col=2)  #posterior mean
+    abline(h=sd(logit(y.data/m)), lwd=2, col=4)  #observed sd in observed phi's
+@
+
+<<traceplotsphis, echo=FALSE, out.width="\\linewidth", fig.height=6>>=
+#plot conditional distributions for phis
+par(mfrow=c(3,1))
+  for (j in 1:3){
+    plot(1:n.gibbs, phi.mat[,j], type="l", ylab=bquote(phi[.(j)]), main=bquote(phi[.(j)]),  
+          xlab="iteration")
+    abline(h=logit(y.data[j]/m[j]), lwd=1, col="blue") #observed proportion   
+}
+@
+
+The histograms of posterior draws are shown below for $\mu$, $\tau$, $\phi_{15}, \phi_{16}, \phi_{17}, \phi_{18}, \phi_{19}$, and $\phi_{20}$ are shown below. 
+
+<<histmutau, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+burn.in <- 1:50
+par(mfrow=c(1,2))
+  hist(mu.vec[-burn.in], col=gray(0.85), nclass=100, freq=F, main="Posterior for mu")
+    abline(v=mean(mu.vec[-burn.in]), lwd=3, col=2)  #posterior mean
+    #abline(v=mean(logit(y.data/m)), lwd=2, col=4) #logit of average of observed proportions, #like empirical phi.bar
+    legend(-11,.65, legend=c("posterior mean"), col=c(2,4), lty=c(1,1,1), lwd=c(2,2,2), bty="n", cex=0.5)
+
+  hist(tau.vec[-burn.in], col=gray(0.85), nclass=100, freq=F, main="Posterior for tau") #true tau
+    abline(v=mean(tau.vec[-burn.in]), lwd=2, col=2)  #posterior mean
+    #abline(v=(1/var(logit(y.data/m))), lwd=2, col=4) #observed data summary
+@
+
+<<histphis, echo=FALSE, out.width="\\linewidth", fig.width=10, eval=FALSE>>=
+#dev.new()
+par(mfrow=c(1,3))
+  for (j in 1:3){
+    hist(phi.mat[-burn.in,j], nclass=50, main=bquote(phi[.(j)]), ylab=bquote(phi[.(j)]),  
+          xlab="iteration", col=gray(0.9))
+    abline(v=y.data[j]/m, lwd=1, col="blue") #observed proportion 
+    abline(v=mean(phi.mat[-burn.in,j]), lwd=1, col=2) #observed proportion  
+}
+@
+
+<<histphisplay, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+#dev.new()
+par(mfrow=c(2,3))
+  for (j in 15:20){
+    hist(phi.mat[-burn.in,j], nclass=50, main=bquote(phi[.(j)]), ylab=bquote(phi[.(j)]),  
+          xlab="iteration", col=gray(0.9))
+    abline(v=y.data[j]/m, lwd=1, col="blue") #observed proportion 
+    abline(v=mean(phi.mat[-burn.in,j]), lwd=1, col=2) #observed proportion  
+}
+@
+
+I transformed the posterior draws from the logit scale to the probability scale, and the histogram of posterior draws for $\pi_{15}, \pi_{16}, \pi_{17}, \pi_{18}, \pi_{19}$, and $\pi_{20}$ are shown below. 
+
+<<pi, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(2,3))
+  for (j in 15:20){
+    pi.mat <- expit(phi.mat[-burn.in, j])
+    hist(pi.mat, nclass=50, main=bquote(pi[.(j)]), ylab=bquote(pi[.(j)]),  
+          xlab="iteration", col=gray(0.9))
+    abline(v=y.data[j]/m[j], lwd=1, col="blue") #observed proportion   
+}
+
+#par(mfrow=c(1,2))
+#  mu.t <- expit(mu.vec[-burn.in])
+ # hist(mu.t, col=gray(0.85), nclass=100, freq=F, main="Posterior for mu")
+  # abline(v=mean((y.data/m[j])), lwd=2, col=4) #average of observed proportions, #like empirical phi.bar
+   # legend(0.005,400, legend=c("observed proportions average"), col=c(4), lty=c(1,1,1), lwd=c(2,2,2), bty="n", cex=0.6)
+@
+
+I noticed a few things in these plots. First, the posterior draws for the $\pi_i$'s that had zero observed data values were bumped up against $0$. The posterior draws for the $\pi_i$'s that had non-zero observed data values look more symmetric, but are more right skewed the closer the count is to $0$. The Missouri county $15$ had the largest posterior probabilities of death due to stomach cancer, and they were between $0.00067$ and $0.00153$. 
+
+\item The code I used to generate posterior predictive counts from the model is shown below. First, I transformed the posterior draws of the $\phi_i$'s to posterior draws of the $\pi_i$'s. Then, for each posterior draw of each $\pi_i$, I drew a random binomial count. 
+
+\begin{singlespace}
+<<pospred, echo=TRUE>>=
+pi.mat <- matrix(NA, nrow=length(phi.mat[-burn.in, 1]), ncol=length(y.data))
+
+for(j in 1:length(y.data)){
+  pi.mat[,j] <- expit(phi.mat[-burn.in, j])
+}
+
+y.sim <- matrix(NA, nrow=length(pi.mat[,1]), ncol=length(y.data))
+
+for(j in 1:length(y.data)) {
+  for(i in 1:length(pi.mat[,1])) {
+    y.sim[i,j] <- rbinom(1, m[j], pi.mat[i,j])
+  }
+}
+@
+\end{singlespace}
+
+I show the barplots of posterior predictive draws below for the logit normal model. I only show the last six cities (cities $15-20$). These plots allow us to check whether the data observed could have been generated from the fitted model. The red lines on these plots are the observed counts.  
+
+<<pospredplots, echo=FALSE, out.width="\\linewidth">>=
+par(mfrow=c(2,3))
+#for (j in 1:6){
+ #   barplot(table(y.sim[,j]), main=bquote(y[.(j)]), ylab=bquote(y[.(j)]),  
+  #        xlab="iteration", col=gray(0.9))
+   # abline(v=y.data[j], lwd=3, col="red") #observed count  
+#}
+
+for (j in 15:20){
+    barplot(table(y.sim[,j]), main=bquote(y[.(j)]), ylab=bquote(y[.(j)]),  
+          xlab="iteration", col=gray(0.9))
+    abline(v=y.data[j], lwd=3, col="red") #observed count  
+}
+@
+
+The code I used to get the posterior predictive draws from the Beta-Binomial model is shown below. I used the $\pi_i$'s generated from the JAGS beta binomial model (run in the extra credit part (f)) to get posterior predictive draws for these $20$ counties.
+
+\begin{singlespace}
+<<pospred2, echo=TRUE>>=
+pi.bb.mat <- as.matrix(betabinom)[,3:22]
+
+ybb.sim <- matrix(NA, nrow=length(pi.bb.mat[,1]), ncol=length(y.data))
+
+for(j in 1:length(y.data)) {
+  for(i in 1:length(pi.bb.mat[,1])) {
+    ybb.sim[i,j] <- rbinom(1, m[j], pi.bb.mat[i,j])
+  }
+}
+@
+\end{singlespace}
+
+
+The barplots of posterior predictive draws are shown below for the Beta-Binomial model. Cities $15$ through $20$ are shown.
+
+<<pospredplots2, echo=FALSE, out.width="\\linewidth">>=
+par(mfrow=c(2,3))
+#for (j in 1:6){
+ #   barplot(table(ybb.sim[,j]), main=bquote(y[.(j)]), ylab=bquote(y[.(j)]),  
+  #        xlab="iteration", col=gray(0.9))
+   # abline(v=y.data[j], lwd=3, col="red") #observed count  
+#}
+
+for (j in 15:20){
+    barplot(table(ybb.sim[,j]), main=bquote(y[.(j)]), ylab=bquote(y[.(j)]),  
+          xlab="iteration", col=gray(0.9))
+    abline(v=y.data[j], lwd=3, col="red") #observed count  
+}
+@
+
+For cities with observed death counts of $0$, the Beta Binomial model had more posterior predictive draws of $0$ (and fewer posterior predictive draws of $1$ and $2$) than the logit normal model. For cities with non-zero observed death counts, the posterior predictive counts appeared to be larger, on average, than the predicted counts from the logit normal model.\\
+
+For further comparison, I compared the maximum posterior predictive proportions in the Beta Binomial model to the logit normal model. I also compared the number of $0$ counts in each posterior predictive draw across models. 
+
+<<ysummaries, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+
+zeros.y.sim <- numeric(length(y.sim[,1]))
+for(i in 1:length(y.sim[,1])) {
+   zeros.y.sim[i] <- sum(y.sim[i,]==0)
+  }
+
+zeros.ybb.sim <- numeric(length(ybb.sim[,1]))
+for(i in 1:length(ybb.sim[,1])) {
+   zeros.ybb.sim[i] <- sum(ybb.sim[i,]==0)
+  }
+
+y1 <- factor(zeros.y.sim, levels=c(0:18))
+y2 <- factor(zeros.ybb.sim, levels=c(0:18))
+zeros.data <- sum(y.data==0)
+y3 <- factor(zeros.data+1, levels=c(0:18))
+
+barplot(table(y1), col="white", main="Number of Zero Counts")
+barplot(table(y2), col="red", add=TRUE)
+abline(v=y3, col="blue", lwd=2)
+legend("topleft", c("Logit Normal", "Beta Bin"), fill=c("white", "red"), cex=0.8)
+
+max.y.sim <- numeric(length(y.sim[,1]))
+for(i in 1:length(y.sim[,1])) {
+   max.y.sim[i] <- max(y.sim[i,]/m)
+  }
+
+max.ybb.sim <- numeric(length(ybb.sim[,1]))
+for(i in 1:length(ybb.sim[,1])) {
+   max.ybb.sim[i] <- max(ybb.sim[i,]/m)
+  }
+
+hist(max.y.sim, nclass=20, freq=FALSE, main="Maximum Posterior Predictive Proportion")
+hist(max.ybb.sim, nclass=20, freq=FALSE, col="red", add=TRUE)
+abline(v=max(y.data/m), col="blue", lwd=2)
+legend("topright", c("Logit Normal", "Beta Bin"), fill=c("white", "red"), cex=0.8)
+@
+
+Over all $30000$ samples, it looks like the number of posterior draws of $0$ in each sample was about the same in the logit normal model as the Beta Binomial model, although the Beta Binomial model had slightly more posterior predictive samples with $11$ or $12$ zeros. Also, it looks like the maximum posterior predictive proportion was higher, on average, for the Beta Binomial model. 
+
+\item {\it Note: I would prefer if you grade this question after grading the whole problem (including the extra credit).}
+
+I really wanted to use the logit normal model for inference, because for some reason I feel more comfortable with a model that assumes that the $logit(\pi_i)$'s are normally distribution rather than a model that assumes that the $\pi_i$'s follow a Beta distribution. I think I feel this way just because I'm more familiar with the Normal distribution. \\
+
+But, in the end, I felt like the Beta-Binomial model dealt with the large number of $0$'s in the dataset better than the logit normal model. If you look at my plots in the extra credit, you can see that more of the posterior draws of $\pi_i$'s were closer to the observed proportions in the dataset. For counties with zero observed counts, the Beta-Binomial model had more small posterior draws of $\pi_i$'s, and as a result the Beta Binomial model had more posterior predictive draws of $0$ than the logit normal model. \\
+
+I like comparing the posterior predictive draws of $\pi_i$'s separately for each county. I don't like calculating a summary statistic for each of the groups of $20$ counties as much, because I feel like this deprives the reader of the ability to compare what differs between the models for individual counties. For example, even though the number of zeros in the posterior predictive draws for the Beta Binomial model were about the same, overall, as the number of zeros in the posterior predictive draws from the logit normal model, this only occurred because the logit normal model predicted fewer zeros in cities with zero observed counts and more zeros in cities with non-zero observed counts. I never would have known this if I hadn't compared posterior predictive draws for individual counties.
+
+\item The logit normal model, fit in JAGs, is shown below. I also showed the model call. Let me know if you have any suggestions about better (or different) ways to call the model.
+
+\begin{singlespace}
+<<jagsmodel, echo=TRUE>>=
+##write model file first
+cat("
+model
+{
+for(i in 1:N)
+{
+logit(pi[i]) <- phi[i]
+y[i] ~ dbin(pi[i], n[i])
+phi[i] ~ dnorm(mu, tau)
+}
+
+mu ~ dnorm(mu.0, K.0*tau)
+tau ~ dgamma(a.0, b.0)
+sigmasq <- pow(tau, -1)
+
+a.0 <- .01
+b.0 <- .01
+K.0 <- 2
+mu.0 <- -10 
+}",
+file="jags-stomachcancer.jags")
+@
+\end{singlespace}
+
+\begin{singlespace}
+<<jagscall, echo=TRUE, results='hide', message=FALSE, cache=TRUE>>=
+##jags call
+library(R2jags)
+set.seed(52)
+
+#change to recache
+
+stomach.data <- list(N=length(y.data), y=y.data, n=m)
+
+inits <- list(list(mu = -4, phi=c(-20:-1), tau = 0.6), 
+              list(mu = -6, phi=c(-1:-20), tau = 0.5), 
+              list(mu = -6, phi =c(-5:-10, -11:-20, -1:-4), tau = 0.3))
+n.chain <- 3
+
+#warmup
+warmup.stomach <- jags.model("jags-stomachcancer.jags", data=stomach.data, n.chains=n.chain, inits = inits, n.adapt=3000, quiet=TRUE)
+
+#parameters to save
+params <- c("phi", "pi", "mu", "tau", "sigmasq")
+
+n.iter=10000
+#running the model for real
+samples <- coda.samples(warmup.stomach, params, n.iter=n.iter)
+@
+\end{singlespace}
+
+Below is a sample of the traceplots. Convergence looks good.
+
+<<jagstraceplots, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+#check traceplots for JAGs model
+par(mfrow=c(1,2))
+
+#traceplot for mu
+plot(1:n.iter, samples[,1][[1]], type="l", xlab="iteration", ylab=expression(mu), main=expression(mu))
+lines(1:n.iter, samples[,1][[2]], col="red")
+lines(1:n.iter, samples[,1][[3]], col="green")
+
+#traceplot for tau
+plot(1:n.iter, samples[,43][[1]], type="l", xlab="iteration", ylab=expression(tau), main=expression(tau))
+lines(1:n.iter, samples[,43][[2]], col="red")
+lines(1:n.iter, samples[,43][[3]], col="green")
+
+#traceplot for the first several phis
+par(mfrow=c(2,3))
+for (j in 2:7){
+  plot(1:n.iter, samples[,j][[1]], type="l", ylab=bquote(phi[.(j)]), 
+       main=bquote(phi[.(j)]), xlab="iteration")
+  lines(1:n.iter, samples[,j][[2]], col="red")
+  lines(1:n.iter, samples[,j][[3]], col="green")   
+}
+@
+
+\item Below, I overlaid the histogram of posterior draws for $\mu$ and the last six $\pi_i$'s from the Gibbs sampler we programmed over the JAGs output. The JAGs draws looked almost identical to the draws from the gibbs sampler we programmed. With $30000$ iterations each, they should look almost exactly the same (at first they did not, and I realized I had a bug in my gibbs sampler).
+
+<<histjagsdraws, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+mu.draws <- as.matrix(samples)[,1]
+#hist of mu draws
+hist(mu.draws, xlab=expression(mu), main=expression(mu), freq=FALSE, nclass=50, ylim=c(0,1.2))
+hist(mu.vec[-burn.in], freq=FALSE, nclass=50, col="red", add=TRUE)
+legend("topleft", c("JAGS", "My Gibbs"), fill=c("gray", "red"), cex=0.7)
+
+tau.draws <- as.matrix(samples)[,43]
+#hist of mu draws
+hist(tau.draws, xlab=expression(tau), main=expression(tau), freq=FALSE, nclass=50)
+hist(tau.vec[-burn.in], freq=FALSE, nclass=50, col="red", add=TRUE)
+legend("topright", c("JAGS", "My Gibbs"), fill=c("gray", "red"), cex=0.7)
+@
+
+<<morejagshists, echo=FALSE, out.width="\\linewidth", fig.width=9>>=
+#define phi draws and pi draws
+phi.draws <- matrix(NA, nrow=n.iter*n.chain, ncol=length(y.data))
+for(j in 1:20){
+  phi.draws[,j] <- as.matrix(samples)[,(j+1)]
+}
+pi.draws <- matrix(NA, nrow=n.iter*n.chain, ncol=length(y.data))
+for(j in 1:20){
+  pi.draws[,j] <- as.matrix(samples)[,(j+21)]
+}
+
+#make histogram of phi draws
+#par(mfrow=c(2,3))
+ # for (j in 15:20){
+  #  hist(phi.draws[,j], nclass=50, main=bquote(phi[.(j)]), 
+   #      ylab=bquote(phi[.(j)]),  
+    #      xlab="iteration", col=gray(0.9))
+    #abline(v=logit(y.data[j]/m[j]), lwd=3, col="blue") #observed logit   
+#}
+
+#make histogram of pi draws
+par(mfrow=c(2,3))
+  for (j in 15:17){
+    hist(pi.draws[,j], nclass=50, main=bquote(pi[.(j)]), 
+         ylab=bquote(pi[.(j)]),  
+          xlab="iteration", col=gray(0.9), freq=FALSE, ylim=c(0, 4000)) 
+    hist(pi.mat[-burn.in,j], col="red", nclass=70, freq=FALSE, add=TRUE)
+    abline(v=y.data[j]/m[j], lwd=1, col="blue") #observed logit   
+    legend("topright", c("JAGS", "My Gibbs"), fill=c("gray", "red"), cex=0.7)
+}
+  for (j in 18:20){
+    hist(pi.draws[,j], nclass=50, main=bquote(pi[.(j)]), 
+         ylab=bquote(pi[.(j)]),  
+          xlab="iteration", col=gray(0.9), freq=FALSE) 
+    hist(pi.mat[-burn.in,j], col="red", nclass=70, freq=FALSE, add=TRUE)
+    abline(v=y.data[j]/m[j], lwd=1, col="blue") #observed logit   
+    legend("topright", c("JAGs", "My Gibbs"), fill=c("gray", "red"), cex=0.7)
+}
+@
+
+ 
+
+\item Below the JAGs code is shown that I used to fit the Beta-Binomial model. I found beta and gamma priors that looked similar to the priors used in the paper.
+
+<<plottheta2prior, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,4))
+#plot prior for eta
+eta <- seq(0,1, by=0.01)
+plot(eta, 1/(eta*(1-eta)), type="l", main="Eta Prior Used in Paper")
+plot(eta, dbeta(eta, .5, .5), type="l", main="Beta(0.5, 0.5)")
+
+#plot prior for kappa
+kappa <- seq(0, 10, by=0.1)
+plot(kappa, kappa/((1+exp(kappa))^2), type="l", main="Kappa Prior Used in Paper")
+plot(kappa, dgamma(kappa, 2,1.5), type="l", main="Gamma(2, 1.5)")
+# dgamma(2, 1.5) 
+@
+
+
+\begin{singlespace}
+<<jagsmodelbetabinom, echo=TRUE>>=
+##write model file first
+cat("
+model
+{
+for(i in 1:N)
+{
+y[i] ~ dbin(pi[i], n[i])
+pi[i] ~ dbeta(a.0, b.0)
+}
+a.0 <- kappa*eta
+b.0 <- kappa*(1-eta)
+
+eta ~ dbeta(.5, .5)
+kappa ~ dgamma(2, 1.5)
+}",
+file="jags-betabinomial.jags")
+@
+\end{singlespace}
+
+\begin{singlespace}
+<<jagscallbetabin, echo=TRUE, results='hide', message=FALSE, cache=TRUE>>=
+##jags call
+library(R2jags)
+set.seed(52)
+
+stomach.data <- list(N=length(y.data), y=y.data, n=m)
+
+inits <- list(list(pi=seq(0.0001, 0.2, length=20), eta = .00003, kappa = .7), 
+              list(pi=seq(0.2, 0.0001, length=20), eta = .2, kappa = 3), 
+              list(pi=c(seq(0.1, 0.2, length=10), seq(0.0001, 0.1, length=10)), 
+                        eta = .03, kappa = .1))
+n.chain <- 3
+
+#warmup
+warmup.betabinom <- jags.model("jags-betabinomial.jags", data=stomach.data, n.chains=n.chain, inits=inits, n.adapt=3000, quiet=TRUE)
+
+#parameters to save
+params <- c("pi", "eta", "kappa")
+
+n.iter=10000
+#running the model for real
+betabinom <- coda.samples(warmup.betabinom, params, n.iter=n.iter)
+@
+\end{singlespace}
+
+The histogram of draws for parameters $\pi_{15}$ through $\pi_{20}$ are shown below. I overlaid the histogram of draws from the logit normal model fit using JAGs. This is similar to what I saw when doing the posterior predictive checks. For counties with observed counts of zero, the posterior probabilities were generally lower for the Beta Binomial model, but for counties with non-zero observed counts, the posterior probabilities were generally higher for the Beta Binomial model.
+
+<<betabinompidraws, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+pi.drawsbeta <- matrix(NA, nrow=n.iter*n.chain, ncol=length(y.data))
+for(j in 1:20){
+  pi.drawsbeta[,j] <- as.matrix(betabinom)[,(j+2)]
+}
+
+#make histogram of pi draws
+par(mfrow=c(2,3))
+  for (j in 15:20){
+    hist(pi.draws[,j], nclass=50, main=bquote(pi[.(j)]), 
+         ylab=bquote(pi[.(j)]),  
+          xlab="iteration", col=1)
+    hist(pi.drawsbeta[,j], nclass=50, col=2, add=TRUE)
+    legend("topright", c("Logit Normal", "Beta Binomial"), fill=c("black", "red"), cex=0.8)
+    abline(v=y.data[j]/m[j], lwd=3, col="blue") #observed logit 
+}
+@
+
+I also compared the median and range of the $\pi_i$'s in this model to the logit normal model. It looks like the Beta Binomial model had lower median posterior probabilities on average, but the range of posterior probabilities was generally wider than the logit normal model.
+
+<<pisummaries, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+
+median.pidraws <- numeric(length(pi.draws[,1]))
+for(i in 1:length(pi.draws[,1])) {
+   median.pidraws[i] <- median(pi.draws[i,])
+  }
+
+median.pidrawsbeta <- numeric(length(pi.drawsbeta[,1]))
+for(i in 1:length(pi.draws[,1])) {
+   median.pidrawsbeta[i] <- median(pi.drawsbeta[i,])
+  }
+
+hist(median.pidraws, nclass=20, main="Median Posterior Probability")
+hist(median.pidrawsbeta, nclass=20, col="red", add=TRUE)
+abline(v=median(y.data/m), col="blue", lwd=2)
+legend("topright", c("Logit Normal", "Beta Bin"), fill=c("white", "red"), cex=0.8)
+
+range.pidraws <- numeric(length(pi.draws[,1]))
+for(i in 1:length(pi.draws[,1])) {
+   range.pidraws[i] <- range(pi.draws[i,])[2]-range(pi.draws[i,])[1]
+  }
+
+range.pidrawsbeta <- numeric(length(pi.drawsbeta[,1]))
+for(i in 1:length(pi.draws[,1])) {
+   range.pidrawsbeta[i] <- range(pi.drawsbeta[i,])[2]-range(pi.drawsbeta[i,])[1]
+  }
+
+hist(range.pidraws, nclass=20, main="Range of Posterior Probabilities")
+hist(range.pidrawsbeta, nclass=20, col="red", add=TRUE)
+abline(v=range(y.data/m)[2]-range(y.data/m)[1], col="blue", lwd=2)
+legend("topright", c("Logit Normal", "Beta Bin"), fill=c("white", "red"), cex=0.8)
+@
+
+
+\end{enumerate}
+
+\item \begin{enumerate}
+\item \begin{itemize}
+\item How is a Bayesian hierarchical model different from a random effects model?
+\item I know that you (Megan) have talked about how a random effect shouldn't be included if the variable was not random in the design (for example, in my and Kenny's experiment, row and block were not random in the design). Is this still something you think about when using a Bayesian hierarchical model?
+\item I understand the ``superpopulation variance'' that Gelman refers to ($\sigma_m^2$) because in random effects models we think about and estimate this quantity in random effects models. But, I'm less familiar with the ``finite population variances'', $s_m^2$. I'm used to thinking about the sums of squares in the ANOVA table as the amount of variability that is explained by each term in the ANOVA table. I'm trying to relate this idea to $s_m$, the standard deviation of regression coefficients in a batch. (larger SD of regression coefficients in a batch means that more variability is explained by that factor?)
+\item The main point I got out of this is that ANOVA is more important than ever because it helps us identify the batches of coefficients. But then he goes on to say, ``The ideas of the analysis of variance also help us to include finite population and superpopulation inferences in a single fitted model, hence unifying fixed and random effects''. I am struggling to understand this statement.
+\item Do you think it's important to learn how to use ANOVA for complicated designs? (I am still unclear how to use ANOVA for complicated designs). Or do you think it's better to always turn to a random effects or hierarchical model for complicated designs?
+\item He talks about ANOVA assuming exchangeable coefficients within each batch. I am confused about how this can be possible. Isn't the point to assess the effects at different levels of a factor?
+\end{itemize}
+
+\item The R code used to simulate data is shown below. I used the original way we used to simulate data to fit a model, and then I grabbed the model matrix. I then simulated coefficients for each effect, and multiplied the simulated effects by the model matrix.  Here's the code we used to simulate the data at first, and the model we fit. I looked at the model matrix to make sure it correctly displayed the nesting structure. 
+
+\begin{singlespace}
+<<kennysim>>=
+# Create some fake data with no differences anywhere
+set.seed(983724)
+fert.sim1 <- data.frame(expand.grid(
+  "status2" = c("CNTL", "INOC"),
+  "n.trt" = c("FALL", "EARLY SPRING", "LATE SPRING"),
+  "variety" = c("Var1", "Var2", "Var3", "Var4", "Var5"),
+  "row" = factor(1:30),
+  "block" = LETTERS[1:6],
+  "total" = 30),
+  "infected" = rnbinom(180, 4, 7/9))
+#  "infected" = sample(fert2$infected, 180, replace = TRUE))
+
+glm3way <- glm(cbind(infected, total) ~ block + row + 
+                 variety*n.trt*status2,
+               family = quasibinomial, data = fert.sim1)
+@
+\end{singlespace}
+
+\begin{singlespace}
+<<simdata, echo=TRUE>>=
+#this grabs the model matrix from the three way interaction binomial model Kenny and I fit (so I don't have to build it myself)
+#the code for fitting the glm3way model is in the appendix
+X <- model.matrix(glm3way)[1:180, 1:64]
+
+set.seed(1132)
+
+m <- 30
+
+#Simulate all main effects and interactions
+baseline <- runif(1, -7, -4)
+block.adj <- rnorm(5, 0, 1)
+variety.adj <- rnorm(4, 0, 1)
+inoc.effect <- rnorm(1, 0, 1)
+nit.effect <- rnorm(2, 0, 1)
+rowinblock <- rnorm(29, 0, .5)
+variety.nit <- rnorm(8, 0, 0.5)
+variety.inoc <- rnorm(4, 0, 0.5)
+nit.inoc <- rnorm(2, 0, 0.5)
+variety.nit.inoc <- rnorm(8, 0, 0.5)
+
+coefs <- c(baseline, block.adj, variety.adj, inoc.effect, nit.effect, rowinblock,
+           variety.nit, variety.inoc, nit.inoc, variety.nit.inoc)
+
+logitp <- X%*%coefs
+p <- exp(logitp)/(1+exp(logitp))
+  
+plotcount.fun <- function(p, m=30){
+  rbinom(1, m, p)
+}
+
+y.data <- apply(p, 1, plotcount.fun)
+@
+\end{singlespace}
+
+
+\item The model is
+$$
+y_i\sim\mathrm{Binomial}(30, p_i),
+$$
+\begin{align*}
+\mathrm{logit}(p_i)&=\mu+block_{b[i]}+row_{b[i],r[i]}
++\beta_{v[i]}+\gamma_{t[i]}+\delta_{j[i]}\\
+&\quad+(\beta\gamma)_{v[i],t[i]}
++(\beta\delta)_{v[i],j[i]}+(\gamma\delta)_{t[i],j[i]}
++(\beta\gamma\delta)_{v[i],t[i],j[i]}
+\end{align*}
+where
+\begin{itemize}
+\item \(p_i\) is the probability of infection in the \(i\)th plot,
+\item \(\mathrm{logit}(p_i)=\log\left(\dfrac{p_i}{1-p_i}\right)\) is the
+natural logarithm of the odds of infection, and
+\item \(b[i]\), \(r[i]\), \(v[i]\), \(t[i]\), and \(j[i]\) index the block, row,
+variety, nitrogen application timing, and inoculation status of
+plot \(i\),
+\item \(a_b\sim\mathrm{N}(0,\sigma^2_a)\) and
+\((ab)_{b,r}\sim\mathrm{N}(0,\sigma^2_{ab})\) are random adjustments for
+each block and each row within each block.
+\item $i \in (1,..,180)$, $b \in (1,...,6)$, $r \in (1,..,5)$, $v \in  (1,...,5)$, $t \in (1,2,3)$, $j \in (1,2)$
+\end{itemize}
+
+\end{enumerate}
+
+\item \begin{enumerate}
+
+\item We are trying to make inference about $\mu, \sigma^2$ where $y_i \sim t_{\nu}(\mu, \sigma^2)$ and $\nu$ is known. We introduce the auxiliary variables $V_i$ and use the following model:
+\begin{align*}
+y_i \sim& N(\mu, V_i) \\
+p(y_i|\mu, V_i) &= \frac{1}{\sqrt{2\pi V_i}}e^{\frac{y_i-\mu^2}{2V_i}} \\
+V_i \sim& Inv-\chi^2(\nu, \sigma^2) \\
+p(V_i|\nu, \sigma^2) &= \frac{(\nu/2)^{\nu/2}}{\Gamma(\nu/2)} \sigma^{\nu} V_i^{-(\nu/2+1)} e^{-\frac{\nu \sigma^2}{2V_i}}
+\end{align*}
+
+He says that he puts uniform priors on $\mu$ and $\sigma^2$, and going through his calculations for the complete conditional distributions, I think he used the following reference priors:
+\begin{align*}
+p(\mu) &\propto 1 \\
+p(\sigma^2) &\propto \frac{1}{\sigma^2}
+\end{align*}
+
+\item The code for the Gibbs sampler from the data augmentation approach is shown below.
+
+\begin{singlespace}
+<<dataaugmentation, echo=TRUE, message=FALSE>>=
+expit <- function(x) {exp(x)/(1+exp(x))}
+logit <- function(x) { log(x/(1-x))}
+
+# Generate data under the model  ##
+set.seed(459)
+n <- 20
+nu <- 30
+y.data <- rt(n, df=nu, ncp=10)
+
+##2. Set up vectors and matrices to store results in
+n.gibbs <- 1000
+nchain <- 3
+mu.vec <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+sigmasq.vec <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+V.mat <- array(NA, dim=c(n.gibbs, length(y.data), nchain))
+
+##3. Set initial values
+mu.vec[1,] <- c(10.2, 9.8, 10.5)  #initial values for mu
+sigmasq.vec[1,] <- c(1, 3, 15)  #initial values for sigmasq
+V.mat[1,,1] <- rep(10, length(y.data)) #initial values for V_i's in chain 1
+V.mat[1,,2] <- rep(5, length(y.data)) #initial values for V_i's in chain 2
+V.mat[1,,3] <- rep(15, length(y.data)) #initial values for V_i's in chain 3
+
+##4. NOW Set up the d steps for each iteration ##
+
+for (k in 1:nchain){
+for (t in 2:n.gibbs) {
+ ## First update the vector of V_j's
+ require(MCMCpack)
+  for (j in 1:length(y.data)) {
+    V.mat[t,j,k] <- rinvgamma(1, (nu+1)/2, 
+                            (nu*sigmasq.vec[t-1,k]+(y.data[j]-mu.vec[t-1,k])^2)/2)
+   }
+ 
+ #(b) Update mu
+ mu.vec[t,k] <- rnorm(1, sum(y.data/V.mat[t,,k])/sum(1/V.mat[t,,k]), 
+                      1/sum(V.mat[t,,k]))
+ 
+ 
+ #(a) Update sigmasq
+ sigmasq.vec[t,k] <- rgamma(1, length(y.data)*nu/2, nu/2*sum(1/V.mat[t,,k]))
+}
+}
+@
+\end{singlespace}
+
+$3$ chains of $1000$ posterior draws of $\mu$ and $\sigma^2$ from the Gibbs sampler coded using the data augmentation approach are shown below. 
+
+<<dataaugplots, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+hist(mu.vec, nclass=50, xlab=expression(mu), main= expression(paste("Data Augmentation ", mu)))
+hist(sigmasq.vec, nclass=50, xlab=expression(sigma^2), main= expression(paste("Data Augmentation ", sigma^2)))
+@
+
+\item The code for the Gibbs sampler from the parameter expansion approach is shown below.
+
+\begin{singlespace}
+<<parameterexpansion, echo=TRUE, message=FALSE>>=
+##2. Set up matrices and arrays to store results in
+n.gibbs <- 1000
+nchain <- 3
+mu.vec2 <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+sigmasq.vec2 <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+tausq.vec <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+alphasq.vec <- matrix(NA, nrow=n.gibbs, ncol=nchain)
+U.mat <- array(NA, dim=c(n.gibbs, length(y.data), nchain))
+V.mat2 <- array(NA, dim=c(n.gibbs, length(y.data), nchain))
+
+##3. Set initial values
+mu.vec2[1,] <-  c(10.2, 9.8, 10.5)  #initial value for mu
+tausq.vec[1,] <- c(.1, .3, 1)  
+alphasq.vec[1,] <- c(4, 2, 3)
+sigmasq.vec2[1,] <- c(1, 3, 15)   #initial value for sigmasq
+U.mat[1,,1] <- rep(10, length(y.data)) #initial values for U_i's in chain 1
+U.mat[1,,2] <- rep(20, length(y.data)) #initial values for U_i's in chain 2
+U.mat[1,,3] <- rep(15, length(y.data)) #initial values for U_i's in chain 3
+
+##4. NOW Set up the d steps for each iteration ##
+
+for (k in 1:nchain) {
+for (t in 2:n.gibbs) {
+ ## First update the vector of U_j's
+  for (j in 1:length(y.data)) {
+    U.mat[t,j,k] <- rinvgamma(1, (nu+1)/2, 
+                            (nu*tausq.vec[t-1,k] + 
+                               (y.data[j]-mu.vec2[t-1,k])^2 /
+                               alphasq.vec[t-1,k])/2)
+    V.mat2[t,j,k] <- alphasq.vec[t-1,k]*U.mat[t,j,k]
+   }
+ 
+ # Update mu
+ mu.vec2[t,k] <- rnorm(1, sum(y.data/V.mat2[t,,k])/sum(1/V.mat2[t,,k]), 
+                       1/sum(V.mat2[t,,k]))
+ 
+ 
+ # Update tausq
+ tausq.vec[t,k] <- rgamma(1, n*nu/2, nu/2*sum(1/U.mat[t,,k]))
+ 
+ #update alphasq
+ alphasq.vec[t,k] <- rinvgamma(1, n/2, sum((y.data-mu.vec2[t,k])^2/U.mat[t,,k])) 
+ 
+ #track sigmasq
+ sigmasq.vec2[t,k] <- alphasq.vec[t,k]*tausq.vec[t,k]
+}
+}
+@
+\end{singlespace}
+
+$3$ chains of $1000$ posterior draws of $\mu$ and $\sigma^2$ from the Gibbs sampler coded using the parameter expansion approach are shown below. 
+
+<<paramexpanplots, echo=FALSE, out.width="\\linewidth", fig.width=12>>=
+par(mfrow=c(1,2))
+hist(mu.vec2, nclass=50, xlab=expression(mu), main= expression(paste("Parameter Expansion ", mu)))
+hist(sigmasq.vec2, nclass=50, xlab=expression(sigma^2), main= expression(paste("Parameter Expansion ", sigma^2)))
+@
+
+\item It says in the book that we should monitor convergence of $\mu$, $\sigma^2$, and $V_i$. The parameters $\alpha^2$, $U$, and $\tau$ in the parameter expansion approach are not identifiable and we cannot estimate each of them, but convergence does appear to occur more quickly with the parameter expansion approach. \\
+
+I only ran $1000$ iterations in order to compare the two methods. For the data augmentation approach, the algorithm has not converged and $1000$ iterations is clearly not enough. The traceplot for $\mu$ looks good, but the traceplot for $\sigma^2$ looks like the chains have not mixed and more iterations are needed to obtain draws from the entire parameter space. In the traceplots for the first three $V_i$'s, we also see that the chains have not mixed completely and more draws are needed to reach convergence. The traceplots from the parameter expansion method, however, indicate that convergence has been reached in only $1000$ iterations, with good mixing among the chains and draws from the entire parameter space for all three chains.
+
+<<traceplots, echo=FALSE, out.width="\\linewidth", fig.width=12>>=
+par(mfrow=c(1,2))
+#traceplots for V in data augmentation approach
+plot(seq(1:n.gibbs), V.mat[,1,1], type="l", ylab=expression(V[1]),
+     main="Data Augmentation")
+        lines(seq(1:n.gibbs), V.mat[,1,2], col=2)
+        lines(seq(1:n.gibbs), V.mat[,1,3], col=3)
+   plot(seq(1:n.gibbs), V.mat[,2,1], type="l", ylab=expression(V[2]),
+        main="Data Augmentation")
+        lines(seq(1:n.gibbs), V.mat[,2,2], col=2)
+        lines(seq(1:n.gibbs), V.mat[,2,3], col=3)
+    plot(seq(1:n.gibbs), V.mat[,3,1], type="l", ylab=expression(V[3]),
+         main="Data Augmentation")
+        lines(seq(1:n.gibbs), V.mat[,3,2], col=2)
+        lines(seq(1:n.gibbs), V.mat[,3,3], col=3)
+
+#traceplots for mu in data augmentation approach
+plot(seq(1:n.gibbs), mu.vec[,1], type="l", ylab=expression(mu), 
+     main="Data Augmentation")
+        lines(seq(1:n.gibbs), mu.vec[,2], col=2)
+        lines(seq(1:n.gibbs), mu.vec[,3], col=3)
+
+#traceplots for sigmasq in data augmentation approach
+plot(seq(1:n.gibbs), sigmasq.vec[,1], type="l", ylab=expression(sigma^2),
+     main="Data Augmentation")
+        lines(seq(1:n.gibbs), sigmasq.vec[,2], col=2)
+        lines(seq(1:n.gibbs), sigmasq.vec[,3], col=3)
+@
+
+<<paramexpandtraceplots, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+#traceplots for V in data augmentation approach
+plot(seq(1:n.gibbs), V.mat2[,1,1], type="l", ylab=expression(V[2]), 
+     main="Parameter Expansion")
+        lines(seq(1:n.gibbs), V.mat2[,1,2], col=2)
+        lines(seq(1:n.gibbs), V.mat2[,1,3], col=3)
+   plot(seq(1:n.gibbs), V.mat2[,2,1], type="l", ylab=expression(V[2]), 
+        main="Parameter Expansion")
+        lines(seq(1:n.gibbs), V.mat2[,2,2], col=2)
+        lines(seq(1:n.gibbs), V.mat2[,2,3], col=3)
+    plot(seq(1:n.gibbs), V.mat2[,3,1], type="l", ylab=expression(V[3]), 
+         main="Parameter Expansion")
+        lines(seq(1:n.gibbs), V.mat2[,3,2], col=2)
+        lines(seq(1:n.gibbs), V.mat2[,3,3], col=3)
+
+#traceplots for mu in data augmentation approach
+plot(seq(1:n.gibbs), mu.vec[,1], type="l", ylab=expression(mu),
+     main="Parameter Expansion")
+        lines(seq(1:n.gibbs), mu.vec2[,2], col=2)
+        lines(seq(1:n.gibbs), mu.vec2[,3], col=3)
+
+#traceplots for sigmasq in data augmentation approach
+plot(seq(1:n.gibbs), sigmasq.vec2[,1], type="l", ylab=expression(sigma^2),
+     main="Parameter Expansion")
+        lines(seq(1:n.gibbs), sigmasq.vec2[,2], col=2)
+        lines(seq(1:n.gibbs), sigmasq.vec2[,3], col=3)
+@
+
+
+
+\end{enumerate}
+
+\item \begin{enumerate}
+\item Yes, I did read Sections $12.4$ and $12.5$, and I discussed them with Claire and Allison. The overall message was that the Gibbs and Metropolis algorithms are inefficient in the way that they move through the parameter space, and the HMC algorithm introduces the momentum parameter that is intended to speed convergence.
+
+%The HMC algorithm introduces this momentum parameter, $\phi$, that allows the algorithm to move faster through the parameter space. The momentum decreases if the draws are moving towards an area of lower posterior density, and the momentum increases in the draws are moving towards an area of higher posterior density.
+
+\item The functions I wrote are shown below, as well as the plots.
+
+\begin{singlespace}
+<<functions, echo=TRUE, out.width="\\linewidth">>=
+postphi.fun <- function(phi, y, n, mu, sigma){
+  exp(phi)^y*(1+exp(phi))^(-n)*exp(-(phi-mu)^2/(2*sigma^2))
+}
+
+dlogpost <- function(phi, y, n, mu, sigma){
+  -y+n*exp(phi)/(1+exp(phi))+(phi-mu)/sigma^2 
+}
+@
+\end{singlespace}
+
+<<plotfun, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,3))
+
+phi.vals <- data.frame(phi=seq(-2,2,by=0.01))
+phipost.out <- apply(phi.vals, 1, postphi.fun, y = 5, n = 10, mu = 0, sigma = 2)
+
+plot(phi.vals$phi, phipost.out, type="l", xlab=expression(phi), ylab=expression(f(phi)), main=expression(f(phi)))
+
+
+logpost <- -log(phipost.out)
+plot(phi.vals$phi, logpost, type="l", xlab=expression(phi), ylab=expression(-logf(phi)), main=expression(-logf(phi)))
+
+dlogpost.out <- apply(phi.vals, 1, dlogpost, y=5, n=10, mu=0, sigma=2)
+plot(phi.vals$phi, dlogpost.out, type="l", xlab=expression(phi), ylab=expression(derivphi(-logf(phi))), main=expression(derivphi(-logf(phi))))
+@
+
+<<rollball, echo=FALSE, eval=FALSE>>=
+setwd("~/Documents/Stat532/homeworks/bayeshw8")
+source("roll.R")
+roll(0, postphi.fun, dlogpost)
+@
+
+Watching the ball roll helped me understand how the momentum influences the jump from draw to draw. When moving towards lower density, the ball made smaller jumps, and when moving towards higher density, the ball made larger jumps. I think looking at the derivative of the negative log posterior function helped me understand that the momentum will be larger when moving towards areas of higher density and smaller when moving towards areas of lower density. Overall, I think it makes sense that the added momentum parameter, $\phi$, helps the draws move more efficiently through the parameter space.
+
+\item Comments and questions:
+
+\begin{itemize}
+
+\item \verb+samp1+, \verb+samp2+, and \verb+samp3+ are S4 objects. They are not mcmc lists like the output returned by \verb+coda.samples+. It seems convenient that you can use the extract function to get the draws for the parameter of interest.
+
+\item There is a traceplot function inside the \verb+rstan+ package similar to the one in the \verb+coda+ package.
+
+\item The default burn-in is the number of iterations divided by $2$. It's an adaptive burn in by default. If there is an adaptive warmup period, should we consider removing additional observations for a burn-in period after the adaptive warmup? It doesn't seem very set up to easily do this.
+
+\item In the linear model with the \verb+mtcars+ data, why do you have to specify beta[1] in the model code?
+
+\item Stan was written in C++.
+
+\item My biggest question is: where are the priors specified? I don't see this anywhere in the model code.
+
+\item The output is really similar to JAGs, with the same convergence diagnostics and summary measures. 
+
+\item In the book, it said the algorithm used by STAN to obtain posterior draws is supposed to be more efficient than Gibbs sampling or the metropolis algorithm. But, it actually took longer for the models to run (with $2000$ iterations) than a JAGs model would take to run with the same number of iterations. Is it that the efficiency isn't noticeable unless you are fitting a model with a large number of parameters?
+
+\item What is this piece for? \verb+increment_log_prob(Ncens * exponential_ccdf_log(C, lambda));+?
+\end{itemize}
+
+\end{enumerate}
+
+\end{enumerate}
+
+
+
+\end{doublespacing}
+
+<<oldsims, echo=FALSE, eval=FALSE>>=
+X.1 <- rep(1, 180)
+
+X.blocks <- rbind(cbind(rep(1,30), matrix(0, nrow=30, ncol=5)),
+                  cbind(rep(0, 30), rep(1, 30), matrix(0, nrow=30, ncol=4)),
+                  cbind(matrix(0, nrow=30, ncol=2), rep(1, 30), 
+                        matrix(0, nrow=30, ncol=3)),
+                  cbind(matrix(0, nrow=30, ncol=3), rep(1, 30), 
+                        matrix(0, nrow=30, ncol=2)),
+                  cbind(matrix(0, nrow=30, ncol=4), rep(1, 30), 
+                        matrix(0, nrow=30, ncol=1)),
+                  cbind(matrix(0, nrow=30, ncol=5), rep(1, 30)))
+
+X.variety <- rbind(cbind(rep(1,6), matrix(0, nrow=6, ncol=4)),
+                   cbind(rep(0, 6), rep(1,6), matrix(0, nrow=6, ncol=3)),
+                   cbind(matrix(0, nrow=6, ncol=2), rep(1, 6), 
+                         matrix(0, nrow=6, ncol=2)),
+                   cbind(matrix(0, nrow=6, ncol=3), rep(1, 6), 
+                         matrix(0, nrow=6, ncol=1)),
+                   cbind(matrix(0, nrow=6, ncol=4), rep(1, 6)))
+
+X.variety <- do.call(rbind, replicate(6, X.variety, simplify=FALSE))
+
+X.trt <- rbind(cbind(rep(1,2), rep(0, 2), rep(0,2)), 
+               cbind(rep(0, 2), rep(1,2), rep(0,2)),
+               cbind(rep(0,2), rep(0,2), rep(1,2)))
+
+X.trt <- do.call(rbind, replicate(30, X.trt, simplify=FALSE))
+
+X.inoc <- do.call(rbind, replicate(90, diag(2), simplify=FALSE))
+
+X <- cbind(X.1, X.blocks, X.variety, X.trt, X.inoc)
+
+@
+
+<<source, echo=FALSE, eval=FALSE>>=
+###run beta-binomial model with rejection sampling
+source("~/Documents/Stat532/Rtutorials/LogisticBetaOverdispersion.R")
+@
+
+\begin{singlespace}
+<<pospred2save, echo=FALSE, eval=FALSE, message=FALSE>>=
+#to do posterior predictive check for a new 20 counties
+
+#first transform theta.draws to eta.draws and K.draws
+eta.draws <- exp(theta.draws[,1])/(1+exp(theta.draws[,1]))
+K.draws <- exp(theta.draws[,2])
+
+#then transform eta.draws and K.draws to alpha and beta
+alpha.draws <- K.draws*(1-eta.draws)
+beta.draws <- K.draws*eta.draws
+alphabeta.draws <- cbind(alpha.draws, beta.draws)
+
+#then draw from beta binomial model with parameters alpha and beta
+require(TailRank)
+
+ybb.sim <- matrix(NA, nrow=length(alpha.draws), ncol=length(y.data))
+
+for(j in 1:length(y.data)){
+  for(i in 1:length(alpha.draws)){
+    ybb.sim[i,j] <- m[j]-rbb(1, m[j], alphabeta.draws[i,1], 
+                             alphabeta.draws[i,2])
+  }
+}
+@
+\end{singlespace}
+
+
+\end{document}
+
+The results looked nicer on the logit scale, so I decided to compare the posterior draws on the logit scale. I found a $95\%$ posterior interval and the mean for each parameter and compared these quantities between our Gibbs sampler and the JAGs output (see table below).
+
+Note, after burn in, I had $10000$ iterations from both methods.
+
+<<compare, echo=FALSE, eval=FALSE>>=
+#our gibbs sampler, mu parameter
+mu.gibbspi <- c(quantile(mu.vec, 0.025), quantile(mu.vec, 0.975))
+mu.jagspi <- c(quantile(mu.draws, 0.025), quantile(mu.draws, 0.975))
+mu.gibbsmean <- mean(mu.vec)
+mu.jagsmean <- mean(mu.draws)
+
+tau.gibbspi <- c(quantile(tau.vec, 0.025), quantile(tau.vec, 0.975))
+tau.jagspi <- c(quantile(tau.draws, 0.025), quantile(tau.draws, 0.975))
+tau.gibbsmean <- mean(tau.vec)
+tau.jagsmean <- mean(tau.draws)
+
+#phis 15 through 20
+phi.gibbspi <- matrix(NA, nrow=length(y.data), ncol=2)
+phi.jagspi <- matrix(NA, nrow=length(y.data), ncol=2)
+phi.gibbsmean <- numeric(length(y.data))
+phi.jagsmean <- numeric(length(y.data))
+for(j in 1:20){
+  phi.gibbspi[j,] <- c(quantile(phi.mat[,j], 0.025), quantile(phi.mat[,j], 0.975))
+  phi.jagspi[j,] <- c(quantile(phi.draws[,j], 0.025), 
+                  quantile(phi.draws[,j], 0.975))
+  phi.gibbsmean[j] <- mean(phi.mat[,j])
+  phi.jagsmean[j] <- mean(phi.draws[,j])
+}
+@
+
+<<table, echo=FALSE, include=FALSE, results='asis', message=FALSE, warning=FALSE, eval=FALSE>>=
+parameter <- c("mu", "tau", "phi_15", "phi_16", "phi_17", "phi_18", "phi_19", "phi_20")
+mygibbs <- rbind(mu.gibbspi, tau.gibbspi, phi.gibbspi[15:20,])
+jags <- rbind(mu.jagspi, tau.jagspi, phi.jagspi[15:20,])
+mygibbs.mean <- c(mu.gibbsmean, tau.gibbsmean, phi.gibbsmean[15:20])
+jags.mean <- c(mu.jagsmean, tau.jagsmean, phi.jagsmean[15:20])
+table <- cbind(parameter, mygibbs, jags, mygibbs.mean, jags.mean)
+require(xtable)
+xtable(table)
+@
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rlllll}
+  \hline
+ & Parameter & My Gibbs &  JAGs & My Gibbs post mean & JAGs post mean \\ 
+  \hline
+1 & $\mu$ & (-8.31, -5.74) & (-9.21, -5.72) & -6.90 & -7.29 \\ 
+  2 & $\tau$ & (0.070, 0.401) & (0.036, 0.209) & 0.197 & 0.104  \\ 
+  3 & $\phi_{15}$ & (-7.19, -6.64) & (-7.19, -6.65) & -6.90 & -6.91  \\ 
+  4 & $\phi_{16}$ & (-13.07, -6.18) & (-15.83, -6.35) & -8.82 & -9.83 \\ 
+  5 & $\phi_{17}$ & (-13.00, -5.55) & (-15.58, -5.70) & -8.51 & -9.43 \\ 
+  6 & $\phi_{18}$ & (-9.27, -5.12) & (-9.62, -5.10) & -6.79 & -6.90 \\ 
+  7 & $\phi_{19}$ & (-6.91, -4.45) & (-6.91, -4.45) & -5.52 & -5.51 \\ 
+  8 & $\phi_{20}$ & (-12.79, -5.50) & (-15.50, -5.68) & -8.38 & -9.38 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+It looks like the results were very similar for the cities with non-zero observed counts (cities $15$, $18$, and $19$). Results varied more for cities with observed counts of zero (cities $16$, $17$, and $20$). The posterior mean and intervals for $\mu$ and $\tau$ also differ between the two methods. I think this occurs because of the difficulty in estimating the stomach cancer rates in cities with observed counts of $0$.

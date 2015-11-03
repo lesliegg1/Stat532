@@ -1,0 +1,26 @@
+
+model
+{
+for(i in 1:N)
+{
+y[i] ~ dbin(p[i], n[i])
+p[i] <- (exp((dose[i]-mu)*tau1)/(1+exp((dose[i]-mu)*tau1)))^m1
+}
+
+mu~dnorm(c0, tau0)
+tau0 <- pow(d0, -2)
+m1 ~ dgamma(a0, b0)
+tau1 ~ dgamma(e0, f0)
+sigma <- pow(tau1, -1)
+phi1 <- mu
+phi2 <- 1/2*log(sigma^2)
+phi3 <- log(m1)
+
+a0 <- 0.25 
+b0 <- 0.25 
+c0 <- 2 
+
+d0 <- 10 
+e0 <- 2.000004 
+f0 <- 0.001 
+}

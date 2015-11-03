@@ -1,0 +1,215 @@
+\documentclass[12pt]{article}
+
+\usepackage{amssymb,amsmath}
+\usepackage{enumerate}
+\usepackage{float}
+\usepackage{verbatim}
+\usepackage{setspace}
+\usepackage{graphicx, multicol}
+
+%% LaTeX margin settings:
+  \setlength{\textwidth}{7.0in}
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{-.5in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+
+%% tell knitr to use smaller font for code chunks
+\def\fs{\footnotesize}
+\def\R{{\sf R}}
+\newcommand{\bfbeta}{\mbox{\boldmath $\beta$}}
+\newcommand{\bfD}{\mbox{\boldmath $D$}}
+\newcommand{\bfL}{\mbox{\boldmath $L$}}
+\newcommand{\bfR}{\mbox{\boldmath $R$}}
+\newcommand{\bfmu}{\mbox{\boldmath $\mu$}}
+\newcommand{\bfv}{\mbox{\boldmath $V$}}
+\newcommand{\bfX}{\mbox{\boldmath $X$}}
+\newcommand{\bfy}{\mbox{\boldmath $y$}}
+\newcommand{\bfb}{\mbox{\boldmath $b$}}
+\begin{document}
+
+<<setup, include=FALSE, cache=FALSE>>=
+  opts_chunk$set(fig.width=5, fig.height=4, out.width='.5\\linewidth', dev='pdf', concordance=TRUE, size='footnotesize')
+options(replace.assign=TRUE,width=72, digits = 3, 
+        show.signif.stars = FALSE)
+@
+  
+  
+\begin{center}
+\large{Bayes: Homework $8$} \\
+Leslie Gains-Germain
+\end{center}
+
+\begin{doublespacing}
+
+\begin{enumerate}
+
+\item \begin{enumerate}
+
+\item \begin{enumerate}
+
+\item Scenario 1: three chains from $N(0, 1)$ white noise.
+\begin{center}
+<<n01, echo=FALSE, out.width=".5\\linewidth">>=
+nsim <- 2000
+set.seed(32093)
+one1 <- rnorm(nsim, 0, 1)
+two1 <- rnorm(nsim, 0, 1)
+three1 <- rnorm(nsim, 0, 1)
+plot(1:nsim, one1, type="l", xlab="iteration", ylab="")
+lines(1:nsim, two1, col="red")
+lines(1:nsim, three1, col="green")
+@
+\end{center}
+
+\item Scenario 2: one chain from $N(-1, 1)$, one chain from $N(0, 1)$, and one chain from $N(1, 1)$.
+\begin{center}
+<<norms, echo=FALSE>>=
+set.seed(908883)
+one2 <- rnorm(nsim, -1, 1)
+two2 <- rnorm(nsim, 0, 1)
+three2 <- rnorm(nsim, 1, 1)
+plot(1:nsim, one2, type="l", xlab="iteration", ylab="")
+lines(1:nsim, two2, col="red")
+lines(1:nsim, three2, col="green")
+@
+\end{center}
+
+\item Scenario 3: three from $MVN(0, \Sigma)$ with common $\sigma^2=1$ and $\rho=0.8$. 
+\begin{center}
+<<mvnorms, echo=FALSE, message=FALSE>>=
+set.seed(321)
+Sigma <- diag(3)
+require(gdata)
+upperTriangle(Sigma) <- 0.8
+lowerTriangle(Sigma) <- 0.8
+
+require(LearnBayes)
+chains <- data.frame(rmnorm(nsim, 0, Sigma))
+names(chains) <- c("one3", "two3", "three3")
+
+plot(1:nsim, chains$one3, type="l", xlab="iteration", ylab="")
+lines(1:nsim, chains$two3, col="red")
+lines(1:nsim, chains$three3, col="green")
+@
+\end{center}
+
+\item Scenario 4: three from non-stationary correlated chains using \verb+diffinv(rnorm(999))+.
+\begin{center}
+<<diffinvnorms, echo=FALSE, message=FALSE>>=
+set.seed(2431)
+one4 <- diffinv(rnorm(nsim-1))
+two4 <- diffinv(rnorm(nsim-1))
+three4 <- diffinv(rnorm(nsim-1))
+
+plot(1:nsim, one4, type="l", xlab="iteration", ylab="", ylim=c(-35, 35))
+lines(1:nsim, two4, col="red")
+lines(1:nsim, three4, col="green")
+@
+\end{center}
+
+\item Scenario 5: three from stationary chains with correlation using \\
+\verb+filter(rnorm(1000), filter=rep(1, 10), circular=TRUE)+.
+\begin{center}
+<<statinvnorms, echo=FALSE, message=FALSE>>=
+set.seed(23090)
+one5 <- filter(rnorm(nsim), filter=rep(1, 10), circular=TRUE)
+two5 <- filter(rnorm(nsim), filter=rep(1, 10), circular=TRUE)
+three5 <- filter(rnorm(nsim), filter=rep(1, 10), circular=TRUE)
+
+plot(1:nsim, one5, type="l", xlab="iteration", ylab="")
+lines(1:nsim, two5, col="red")
+lines(1:nsim, three5, col="green")
+@
+\end{center}
+
+\end{enumerate}
+
+\item The effective sample size is calculated differently in the newest version of the \verb+coda+ package than described in the textbook. In the textbook, the effective sample size is dividing the number of iterations (over all chains) by a formula that measures autocorrelation, so that chains with higher autocorrelation have lower effective sample sizes. In the newest version of the \verb+coda+ package, however, the number of iterations is divided by the spectral density. Details are on page $286$ of the BDA3 text and the Effective Sample size section of the convergence diagnostic document. \\
+
+In the coda package, $\hat{R}$ is calculated in the same way as the described in Chapter $11$ in the BDA3 textbook.
+
+\item The below table shows the $\hat{R}$ and effective sample sizes for each scenario.
+
+<<showall, echo=FALSE, message=FALSE, results='asis'>>=
+require(coda)
+s1 <- mcmc.list(list(mcmc(one1), mcmc(two1), mcmc(three1)))
+s1neff <- effectiveSize(s1)
+s1rhat <- gelman.diag(s1)$psrf[1]
+
+s2 <- mcmc.list(list(mcmc(one2), mcmc(two2), mcmc(three2)))
+s2neff <- effectiveSize(s2)
+s2rhat <- gelman.diag(s2)$psrf[1]
+
+s3 <- mcmc.list(list(mcmc(chains$one3), mcmc(chains$two3), mcmc(chains$three3)))
+s3neff <- effectiveSize(s3)
+s3rhat <- gelman.diag(s3)$psrf[1]
+
+s4 <- mcmc.list(list(mcmc(one4), mcmc(two4), mcmc(three4)))
+s4neff <- effectiveSize(s4)
+s4rhat <- gelman.diag(s4)$psrf[1]
+
+s5 <- mcmc.list(list(mcmc(one5), mcmc(two5), mcmc(three5)))
+s5neff <- effectiveSize(s5)
+s5rhat <- gelman.diag(s5)$psrf[1]
+
+neff <- c(s1neff, s2neff, s3neff, s4neff, s5neff)
+rhat <- c(s1rhat, s2rhat, s3rhat, s4rhat, s5rhat)
+scenario <- c("1", "2", "3", "4", "5")
+diags <- cbind.data.frame(scenario, neff, rhat)
+require(xtable)
+print(xtable(diags), include.rownames=FALSE)
+@
+
+\item The table below shows the z-statistics for all three chains from Geweke's diagnostic. The last three columns show the results from Raftery and Lewis's diagnostic (burn in and iterations required as well as the dependence factor).
+
+<<otherdiags, echo=FALSE, results='asis', message=FALSE>>=
+zstats1 <- c(geweke.diag(s1)[[1]]$z, geweke.diag(s2)[[1]]$z, geweke.diag(s3)[[1]]$z, geweke.diag(s4)[[1]]$z, geweke.diag(s5)[[1]]$z)
+
+zstats2 <- c(geweke.diag(s1)[[2]]$z, geweke.diag(s2)[[2]]$z, geweke.diag(s3)[[2]]$z, geweke.diag(s4)[[2]]$z, geweke.diag(s5)[[2]]$z)
+
+zstats3 <- c(geweke.diag(s1)[[3]]$z, geweke.diag(s2)[[3]]$z, geweke.diag(s3)[[3]]$z, geweke.diag(s4)[[3]]$z, geweke.diag(s5)[[3]]$z)
+
+s1 <- mcmc(c(one1, two1, three1))
+s2 <- mcmc(c(one2, two2, three2))
+s3 <- mcmc(c(chains$one3, chains$two3, chains$three3))
+s4 <- mcmc(c(one4, two4, three4))
+s5 <- mcmc(c(one5, two5, three5))
+
+burn.in <- c(raftery.diag(s1)[[2]][1], raftery.diag(s2)[[2]][1], raftery.diag(s3)[[2]][1], 
+          raftery.diag(s4)[[2]][1], raftery.diag(s5)[[2]][1])
+
+n.iter <- c(raftery.diag(s1)[[2]][2], raftery.diag(s2)[[2]][2], raftery.diag(s3)[[2]][2], 
+          raftery.diag(s4)[[2]][2], raftery.diag(s5)[[2]][2])
+
+dependence.factor <- c(raftery.diag(s1)[[2]][4], raftery.diag(s2)[[2]][4], raftery.diag(s3)[[2]][4], 
+          raftery.diag(s4)[[2]][4], raftery.diag(s5)[[2]][4])
+
+other.diags <- cbind.data.frame(scenario, zstats1, zstats2, zstats3, burn.in, n.iter, dependence.factor)
+
+print(xtable(other.diags), include.rownames=FALSE)
+@
+
+
+\end{enumerate}
+
+\item 
+
+\item \begin{enumerate}
+
+\item \begin{enumerate}
+\item My R function to calculate the density of a folded non-central t-distribution is shown below.
+<<density, echo=TRUE>>=
+# function to calculate density of a folded non-central t-distribution
+@
+
+\item 
+\end{enumerate}
+
+\end{enumerate}
+
+\end{enumerate}
+
+\end{doublespacing}
+
+\end{document}

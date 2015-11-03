@@ -1,0 +1,9 @@
+
+model
+{
+y ~ dnorm(mu, 1/2)
+mu~dnorm(mu0, tau0)
+tau0 <-pow(sigma0, -2)
+mu0 <- 10
+sigma0 <- 5
+}

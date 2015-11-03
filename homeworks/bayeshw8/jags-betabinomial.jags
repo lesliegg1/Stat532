@@ -1,0 +1,14 @@
+
+model
+{
+for(i in 1:N)
+{
+y[i] ~ dbin(pi[i], n[i])
+pi[i] ~ dbeta(a.0, b.0)
+}
+a.0 <- kappa*eta
+b.0 <- kappa*(1-eta)
+
+eta ~ dbeta(.5, .5)
+kappa ~ dgamma(2, 1.5)
+}

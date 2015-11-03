@@ -1,0 +1,13 @@
+base
+knitr
+MASS
+Matrix
+lme4
+arm
+LearnBayes
+oompaBase
+TailRank
+coda
+rjags
+R2jags
+xtable

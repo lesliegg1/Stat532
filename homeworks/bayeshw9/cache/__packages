@@ -1,0 +1,11 @@
+base
+knitr
+gdata
+LearnBayes
+coda
+xtable
+MASS
+MCMCpack
+Rcpp
+ggplot2
+rstan

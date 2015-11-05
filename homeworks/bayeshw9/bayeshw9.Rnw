@@ -48,7 +48,7 @@ Leslie Gains-Germain
 
 \item \begin{enumerate}
 
-\item Scenario 1: three chains from $N(0, 1)$ white noise.
+\item Scenario 1: three chains from $N(0, 1)$ white noise. I actually ran $2000$ iterations in each chain so that I could use Raftery and Lewis's diagnostic in part (e).
 \begin{center}
 <<n01, echo=FALSE, out.width=".5\\linewidth">>=
 nsim <- 2000
@@ -79,18 +79,19 @@ lines(1:nsim, three2, col="green")
 \begin{center}
 <<mvnorms, echo=FALSE, message=FALSE>>=
 set.seed(321)
-Sigma <- diag(3)
+Sigma <- diag(nsim)
 require(gdata)
 upperTriangle(Sigma) <- 0.8
 lowerTriangle(Sigma) <- 0.8
 
 require(LearnBayes)
-chains <- data.frame(rmnorm(nsim, 0, Sigma))
-names(chains) <- c("one3", "two3", "three3")
+one3 <- c(rmnorm(1, rep(0, nsim), Sigma))
+two3 <- c(rmnorm(1, rep(0, nsim), Sigma))
+three3 <- c(rmnorm(1, rep(0, nsim), Sigma))
 
-plot(1:nsim, chains$one3, type="l", xlab="iteration", ylab="")
-lines(1:nsim, chains$two3, col="red")
-lines(1:nsim, chains$three3, col="green")
+plot(1:nsim, one3, type="l", xlab="iteration", ylab="", ylim=c(-1,3))
+lines(1:nsim, two3, col="red")
+lines(1:nsim, three3, col="green")
 @
 \end{center}
 
@@ -141,7 +142,7 @@ s2 <- mcmc.list(list(mcmc(one2), mcmc(two2), mcmc(three2)))
 s2neff <- effectiveSize(s2)
 s2rhat <- gelman.diag(s2)$psrf[1]
 
-s3 <- mcmc.list(list(mcmc(chains$one3), mcmc(chains$two3), mcmc(chains$three3)))
+s3 <- mcmc.list(list(mcmc(one3), mcmc(two3), mcmc(three3)))
 s3neff <- effectiveSize(s3)
 s3rhat <- gelman.diag(s3)$psrf[1]
 
@@ -172,7 +173,7 @@ zstats3 <- c(geweke.diag(s1)[[3]]$z, geweke.diag(s2)[[3]]$z, geweke.diag(s3)[[3]
 
 s1 <- mcmc(c(one1, two1, three1))
 s2 <- mcmc(c(one2, two2, three2))
-s3 <- mcmc(c(chains$one3, chains$two3, chains$three3))
+s3 <- mcmc(c(one3, two3, three3))
 s4 <- mcmc(c(one4, two4, three4))
 s5 <- mcmc(c(one5, two5, three5))
 
@@ -190,21 +191,241 @@ other.diags <- cbind.data.frame(scenario, zstats1, zstats2, zstats3, burn.in, n.
 print(xtable(other.diags), include.rownames=FALSE)
 @
 
+\item Looking at the traceplots, stationarity has not been reached in Scenarios $2$, $3$, and $4$, and we would hope that the convergence diagnostics would flag this.
+
 
 \end{enumerate}
 
-\item 
+\item \begin{enumerate}
+
+\item $\sigma_{\alpha}^2$ is $Inv-Gamma(0.001, 0.001)$ which is the same as a scaled inverse chi squared distribution with parameters $\nu=0.002$ and $s^2=1$.
+
+\item The plots of all the priors are shown below.
+<<plotprior, echo=FALSE, message=FALSE, out.width="\\linewidth", fig.width=10, cache=TRUE>>=
+par(mfrow=c(2,3))
+
+require(MCMCpack)
+sigmasq <- seq(0, 100, by=0.01)
+plot(sigmasq, dinvgamma(sigmasq, 0.001, 0.001), type="l", main="InvGamma(0.001, 0.001)", xlab=expression(sigma^2), col=2, lwd=2)
+
+logsigma <- seq(-.6, .6, by = 0.01)
+plot(logsigma, dunif(logsigma, -100, 100), type="l", main="Unif(-100, 100) on log(sigma)", xlab=expression(log(sigma)), col=2, lwd=2)
+
+plot(sigmasq, dunif(sigmasq, 0, 100), type="l", main="Unif(0, 100) on sigma", xlab=expression(sigma), col=2, lwd=2)
+
+setwd("~/Documents/Stat532/Rtutorials/8 schools")
+ source("folded_t_functions.R")  
+ curve(d.tfold(x, df=4), xlim=c(0,5), ylim=c(0,0.85), xlab=expression(sigma),
+               col=2, lwd=2, main="Folded t with df=4")
+
+plot(sigmasq, 1/sigmasq, type="l", main="1/sigmasq", xlab=expression(sigma^2), col=2, lwd=2)
+#ask about this one, make the constant anything?
+
+plot(sigmasq, rep(1, length(sigmasq)), type="l", main="sigma proportional to 1", xlab=expression(sigma^2), col=2, lwd=2)
+
+Gustaf.prior <- function(sigmasqtheta, sigmasqy=1, a=7){
+  a/sigmasqy*(1+sigmasqtheta/sigmasqy)^(a+1)
+}
+
+gustafprior <- apply(cbind(sigmasq), 1, Gustaf.prior)
+
+plot(sigmasq, gustafprior, type="l", main="Gustaf Prior, sigma_y^2=1, a=7"
+       , xlab=expression(sigma^2), col=2, lwd=2)
+@
+
+\item Next, I took random draws from prior B and I exponentiated these draws to compare to prior C. Clearly, a prior of $log(\sigma)$ is very different from a uniform prior on $\sigma$. The plot is hard to see, but you can tell that after drawing from a $Unif(-100, 100)$ prior on $log(\sigma)$, you get many very large values for $\sigma$ (not shown), and you get many very very small values for $\sigma$. This is why the $log(\sigma)$ prior blows up at zero. Priors B and C generate very different values for $\sigma$. It makes sense why Gelman recommends a uniform prior on the standard deviation rather than a uniform prior on the log standard deviation.
+
+\begin{center}
+<<priorsigmatheta, echo=FALSE>>=
+logsigma.draws <- runif(1000, -100, 100)
+sigma.b.draws <- exp(logsigma.draws)
+sigma.b.cut <- sigma.b.draws[sigma.b.draws<=100]
+hist(sigma.b.cut, freq=FALSE, main="Prior B vs C", nclass=30, xlim=c(0, 100), xlab=expression(sigma))
+lines(seq(0,100, by=.01), dunif(seq(0, 100, by=.01), 0, 100), col="red", lwd=2)
+legend(40, 0.213, c("Prior B", "Prior C"), fill=c("red", "white"), cex=0.5)
+@
+\end{center}
+
+
+\item I took $10000$ random draws from a $Unif(0, 100)$ distribution of $\sigma_{\theta}$, and then I exponentiated these draws to compare to the Inverse Gamma prior on $\sigma_{\theta}^2$. It actually looks like the $Uniform(0, 100)$ prior on $\sigma_{\theta}$ is similar in shape to a $Inv-Gamma(0.001, 0.001)$ prior on $\sigma^2_{\theta}$, but the uniform prior on the standard deviation looks better because although there are many $\sigma^2_{\theta}$ values near $0$, the prior does not blow up at zero like the Inverse Gamma prior does.
+
+<<comparecanda, echo=FALSE>>=
+sigma.c.draws <- runif(10000, 0, 100)
+sigmasq.c.draws <- sigma.c.draws^2
+hist(sigmasq.c.draws, freq=FALSE, xlim=c(0, 200), nclass=1500, main="Prior C vs A", xlab=expression(sigma^2))
+lines(seq(0,200, by=.01), dinvgamma(seq(0, 200, by=.01), 0.001, 0.001), col="red", lwd=2)
+legend(20, 0.0035, c("Prior A", "Prior C"), fill=c("red", "white"), cex=0.5)
+@
+
+
+\item A half-Cauchy distribution is a half t-distribution with $1$ df. 
+
+\end{enumerate}
 
 \item \begin{enumerate}
 
 \item \begin{enumerate}
-\item My R function to calculate the density of a folded non-central t-distribution is shown below.
+\item The \verb+dtfolded+ function below calculates the density of a folded half t distribution with $4$ degrees of freedom and a scale of $1$.
+\begin{center}
+\begin{singlespace}
 <<density, echo=TRUE>>=
 # function to calculate density of a folded non-central t-distribution
+dtfolded <- function (x, df=4, A=1) {
+  p <- (1+1/df*(x/A)^2)^(-(df+1)/2)  
+  num.int <- sum(p*(x[2]-x[1]))
+  dt <- p/num.int
+  return(dt)
+}
+
+x <- seq(0, 20, by=0.01)
+
+plot(x, dtfolded(x), type="l", main="Half-t density", lwd=2)
+@
+\end{singlespace}
+\end{center}
+
+\item The \verb+rtfolded+ function below generates a random draw from the folded t distribution with $4$ degrees of freedom and scale parameter of $3$.
+\begin{singlespace}
+\begin{center}
+<<randomdrawsfoldedt, echo=TRUE>>=
+rtfolded <- function(nsim, df=4, mu=0, sigma=1, A=3){
+  z <- abs(rnorm(nsim, mu, sigma))
+  x <- rgamma(nsim, df/2, (1/2*A^2))
+  theta <- mu+sigma*z*sqrt(df/x)
+  return(theta)
+}
+
+set.seed(31)
+hist(rtfolded(1000), freq=FALSE, nclass=40)
+lines(x, dtfolded(x, A=3), lwd=3)
+@
+\end{center}
+\end{singlespace}
+
+\end{enumerate}
+
+\item The basic hierarchical model is:
+\begin{align*}
+y_{ij} \sim N(\mu+\alpha_j, \sigma^2_y) \\
+\alpha_j \sim N(0, \sigma^2_{\alpha})
+\end{align*}
+
+
+\item I used the code below to simulate $y_{ij}$. I first simulated the group effects, and then I simulated individual effects within each group. The code is adapted from your code in \verb+SchoolsFakeData_CompareMethods_F13.R+. The boxplots showing the simulated data are shown below.
+
+\begin{singlespace}
+<<simulate, echo=TRUE>>=
+ n.j <- c(5, 10, 30, 30, 20, 25, 50, 10)
+ n.tot <- sum(n.j)
+
+ J <- 8
+ sigma.y <- 2
+
+ mu <- 20
+ sigma.alpha <- sqrt(2)
+
+alpha <- numeric(J)
+for(j in 1:J){
+  alpha[j] <- rnorm(1, 0, sd=sigma.alpha)
+}
+ 
+ set.seed(2567)
+ y.ij <- numeric(n.tot)
+ school <- rep(NA,n.tot)
+ n.index <- c(0, cumsum(n.j)) +1
+ for (j in 1:J) {
+   y.ij[n.index[j]:(n.index[j+1]-1)] <- rnorm(n.j[j], mean=mu+alpha[j], sd=sigma.y)
+   school[n.index[j]:(n.index[j+1]-1)] <- rep(LETTERS[j], n.j[j])
+ }
+ school <- factor(school)
+@
+\end{singlespace}
+
+<<plotsims>>=
+ ### Plot the raw fake data ####
+ boxplot(y.ij ~ school, col="gray", var.width=TRUE)
+   points(school, y.ij)
+   points(1:8, mu+alpha, col="red", cex=2, pch=20)
+@
+
+\item Priors:
+\begin{align*}
+\mu \propto 1
+\end{align*}
+
+\item Fit the model in STAN
+
+<<stanmodel, echo=FALSE, message=FALSE, results='hide'>>=
+require(rstan)
+
+J <- 8
+y_1 <- y.ij[school=="A"]
+y_2 <- y.ij[school=="B"]
+y_3 <- y.ij[school=="C"]
+y_4 <- y.ij[school=="D"]
+y_5 <- y.ij[school=="E"]
+y_6 <- y.ij[school=="F"]
+y_7 <- y.ij[school=="G"]
+y_8 <- y.ij[school=="H"]
+
+basicmodel.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/basicmodel.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
 @
 
 \item 
-\end{enumerate}
+
+<<invgamma, echo=FALSE, cache=TRUE, results='hide'>>=
+invgamma.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/invgamma.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+@
+
+<<uniform, echo=FALSE, cache=TRUE, results='hide'>>=
+unif.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/properunif.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+@
+
+\item
+
+<<plotpost, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,3))
+hist(extract(basicmodel.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="Improper Uniform Prior")
+
+hist(extract(invgamma.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="InvGamma(1, 1) Prior")
+
+hist(extract(unif.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="Unif(0, 10000) Prior")
+@
+
+\item 
+
+<<plotmupost, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,3))
+hist(extract(basicmodel.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of mu Improper Uniform Prior")
+
+hist(extract(invgamma.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of alpha_sigma InvGamma(1, 1) Prior")
+
+hist(extract(unif.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of alpha_sigma Unif(0, 10000) Prior")
+@
+
+\item 
+<<reparam, echo=FALSE, cache=TRUE, results='hide'>>=
+sigma_eta <- 1
+reparam.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparam.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J", "sigma_eta"), iter=1000, chains=4)
+@
+
+<<compare3, echo=FALSE, out.width="\\linewidth">>=
+par(mfrow=c(1,2))
+hist(extract(reparam.fit)$psi*extract(reparam.fit)$sigma_eta, nclass=50, xlab="sigma_alpha", main="Folded Normal Prior")
+
+hist(extract(reparam.fit)$mu, nclass=50, xlab="mu", main="Folded Normal Prior")
+@
+
+<<reparamcauchy, echo=FALSE, cache=TRUE, results='hide'>>=
+reparamcauchy.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparamcauchy.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+@
+
+<<compare4, echo=FALSE, out.width="\\linewidth">>=
+par(mfrow=c(1,2))
+hist(extract(reparamcauchy.fit)$sigma_eta*extract(reparamcauchy.fit)$psi, nclass=50, xlab="sigma_alpha", main="Half Cauchy Prior")
+
+hist(extract(reparamcauchy.fit)$mu, nclass=50, xlab="mu", main="Half Cauchy Prior")
+@
 
 \end{enumerate}
 

@@ -36,7 +36,7 @@ options(replace.assign=TRUE,width=72, digits = 3,
   
   
 \begin{center}
-\large{Bayes: Homework $8$} \\
+\large{Bayes: Homework $9$} \\
 Leslie Gains-Germain
 \end{center}
 
@@ -56,9 +56,9 @@ set.seed(32093)
 one1 <- rnorm(nsim, 0, 1)
 two1 <- rnorm(nsim, 0, 1)
 three1 <- rnorm(nsim, 0, 1)
-plot(1:nsim, one1, type="l", xlab="iteration", ylab="")
-lines(1:nsim, two1, col="red")
-lines(1:nsim, three1, col="green")
+plot(1:2000, one1, type="l", xlab="iteration", ylab="")
+lines(1:2000, two1, col="red")
+lines(1:2000, three1, col="green")
 @
 \end{center}
 
@@ -126,7 +126,7 @@ lines(1:nsim, three5, col="green")
 
 \end{enumerate}
 
-\item The effective sample size is calculated differently in the newest version of the \verb+coda+ package than described in the textbook. In the textbook, the effective sample size is dividing the number of iterations (over all chains) by a formula that measures autocorrelation, so that chains with higher autocorrelation have lower effective sample sizes. In the newest version of the \verb+coda+ package, however, the number of iterations is divided by the spectral density. Details are on page $286$ of the BDA3 text and the Effective Sample size section of the convergence diagnostic document. \\
+\item The effective sample size is calculated differently in the newest version of the \verb+coda+ package than described in the textbook. In the textbook, the effective sample size is found by dividing the number of iterations (over all chains) by a formula that measures autocorrelation, so that chains with higher autocorrelation have lower effective sample sizes. In the newest version of the \verb+coda+ package, however, the number of iterations is divided by the spectral density. Details are on page $286$ of the BDA3 text and the Effective Sample size section of the convergence diagnostic document. \\
 
 In the coda package, $\hat{R}$ is calculated in the same way as the described in Chapter $11$ in the BDA3 textbook.
 
@@ -191,8 +191,30 @@ other.diags <- cbind.data.frame(scenario, zstats1, zstats2, zstats3, burn.in, n.
 print(xtable(other.diags), include.rownames=FALSE)
 @
 
-\item Looking at the traceplots, stationarity has not been reached in Scenarios $2$, $3$, and $4$, and we would hope that the convergence diagnostics would flag this.
+\item Convergence in Scenario $1$ looks good - there is little autocorrelation within chains, and the between chain variability is low. Scenario $2$ has little autocorrelation within chains, but large between chain variability. Scenario $3$ looks similar to Scenario $2$, but I think something might have gone wrong (see discussion below). Scenario $4$ has both high correlation within chains and large between chain variability. Scenario $5$ has small between chain variability but high correlation within chains. \\
 
+I am confused about Scenario $3$ and worried that I coded the simulations wrong. This scenario is supposed to be three chains with high correlation among the draws within each chain. But, for some reason, the chains get stuck in the part of the parameter space where they start. I would have expected to see a traceplot more similar to Scenario $4$. Below is the code I used for Scenario $3$:
+\begin{singlespace}
+<<showcode, echo=TRUE>>=
+set.seed(321)
+nsim <- 2000
+Sigma <- diag(nsim)
+require(gdata)
+upperTriangle(Sigma) <- 0.8
+lowerTriangle(Sigma) <- 0.8
+
+require(LearnBayes)
+one3 <- c(rmnorm(1, rep(0, nsim), Sigma))
+two3 <- c(rmnorm(1, rep(0, nsim), Sigma))
+three3 <- c(rmnorm(1, rep(0, nsim), Sigma))
+@
+\end{singlespace}
+
+Geweke's Diagnostic picks up on a problem with Scenario $4$, with large z-statistics for all three chains. Geweke's diagnostic does not, however, does not pick up on the large between chain variability in Scenario $2$. I definitely would not want to use Geweke's diagnostic blindly without looking at a traceplot. Raftery and Lewis's diagnostic picks up on the high within chain correlation for Scenarios $4$ and $5$, but it also does not pick up on large variability between chains in Scenarios $2$ and $3$. \\
+
+I think a main point of this exercise is to notice that it is not enough to look at one convergence diagnostic only. It's important to look at the traceplots and several convergence diagnostics. A good example of this is Scenario $2$. In this scenario, the effective sample size indicates little autocorrelation within the chains, but the $\hat{R}$ value reveals the large amount of between chain variability. If I had only looked at the effective sample size without looking at the traceplots and $\hat{R}$, I wouldn't have known there was a problem with convergence. Another example of this is Scenario $5$. In Scenario $5$, the $\hat{R}$ value is close to $1$, but the effective sample size is low ($540$ out of $2000$ trials), indicating correlation among the chains. Lesson: Always consider several diagnostics and the traceplots when assessing convergence!
+
+{\bf Question: What is the difference between saying a chain is stationary and saying that convergence has been reached?}
 
 \end{enumerate}
 
@@ -201,6 +223,7 @@ print(xtable(other.diags), include.rownames=FALSE)
 \item $\sigma_{\alpha}^2$ is $Inv-Gamma(0.001, 0.001)$ which is the same as a scaled inverse chi squared distribution with parameters $\nu=0.002$ and $s^2=1$.
 
 \item The plots of all the priors are shown below.
+
 <<plotprior, echo=FALSE, message=FALSE, out.width="\\linewidth", fig.width=10, cache=TRUE>>=
 par(mfrow=c(2,3))
 
@@ -213,7 +236,7 @@ plot(logsigma, dunif(logsigma, -100, 100), type="l", main="Unif(-100, 100) on lo
 
 plot(sigmasq, dunif(sigmasq, 0, 100), type="l", main="Unif(0, 100) on sigma", xlab=expression(sigma), col=2, lwd=2)
 
-setwd("~/Documents/Stat532/Rtutorials/8 schools")
+setwd("~/Documents/Stat532/homeworks/bayeshw9")
  source("folded_t_functions.R")  
  curve(d.tfold(x, df=4), xlim=c(0,5), ylim=c(0,0.85), xlab=expression(sigma),
                col=2, lwd=2, main="Folded t with df=4")
@@ -224,7 +247,7 @@ plot(sigmasq, 1/sigmasq, type="l", main="1/sigmasq", xlab=expression(sigma^2), c
 plot(sigmasq, rep(1, length(sigmasq)), type="l", main="sigma proportional to 1", xlab=expression(sigma^2), col=2, lwd=2)
 
 Gustaf.prior <- function(sigmasqtheta, sigmasqy=1, a=7){
-  a/sigmasqy*(1+sigmasqtheta/sigmasqy)^(a+1)
+  a/sigmasqy*(1+sigmasqtheta/sigmasqy)^(-(a+1))
 }
 
 gustafprior <- apply(cbind(sigmasq), 1, Gustaf.prior)
@@ -233,7 +256,7 @@ plot(sigmasq, gustafprior, type="l", main="Gustaf Prior, sigma_y^2=1, a=7"
        , xlab=expression(sigma^2), col=2, lwd=2)
 @
 
-\item Next, I took random draws from prior B and I exponentiated these draws to compare to prior C. Clearly, a prior of $log(\sigma)$ is very different from a uniform prior on $\sigma$. The plot is hard to see, but you can tell that after drawing from a $Unif(-100, 100)$ prior on $log(\sigma)$, you get many very large values for $\sigma$ (not shown), and you get many very very small values for $\sigma$. This is why the $log(\sigma)$ prior blows up at zero. Priors B and C generate very different values for $\sigma$. It makes sense why Gelman recommends a uniform prior on the standard deviation rather than a uniform prior on the log standard deviation.
+\item I took random draws from prior B and I exponentiated these draws to compare to prior C. Clearly, a prior of $log(\sigma)$ is very different from a uniform prior on $\sigma$. The plot is hard to see, but you can tell that after drawing from a $Unif(-100, 100)$ prior on $log(\sigma)$, you get many very large values for $\sigma$ (not shown), and you get many very very small values for $\sigma$. This is why the $log(\sigma)$ prior blows up at zero. Priors B and C generate very different values for $\sigma$. It makes sense why Gelman recommends a uniform prior on the standard deviation rather than a uniform prior on the log standard deviation.
 
 \begin{center}
 <<priorsigmatheta, echo=FALSE>>=
@@ -242,14 +265,15 @@ sigma.b.draws <- exp(logsigma.draws)
 sigma.b.cut <- sigma.b.draws[sigma.b.draws<=100]
 hist(sigma.b.cut, freq=FALSE, main="Prior B vs C", nclass=30, xlim=c(0, 100), xlab=expression(sigma))
 lines(seq(0,100, by=.01), dunif(seq(0, 100, by=.01), 0, 100), col="red", lwd=2)
-legend(40, 0.213, c("Prior B", "Prior C"), fill=c("red", "white"), cex=0.5)
+legend(40, 0.16, c("Prior B", "Prior C"), fill=c("red", "white"), cex=0.5)
 @
 \end{center}
 
 
 \item I took $10000$ random draws from a $Unif(0, 100)$ distribution of $\sigma_{\theta}$, and then I exponentiated these draws to compare to the Inverse Gamma prior on $\sigma_{\theta}^2$. It actually looks like the $Uniform(0, 100)$ prior on $\sigma_{\theta}$ is similar in shape to a $Inv-Gamma(0.001, 0.001)$ prior on $\sigma^2_{\theta}$, but the uniform prior on the standard deviation looks better because although there are many $\sigma^2_{\theta}$ values near $0$, the prior does not blow up at zero like the Inverse Gamma prior does.
 
-<<comparecanda, echo=FALSE>>=
+<<comparecanda, echo=FALSE, message=FALSE>>=
+require(MCMCpack)
 sigma.c.draws <- runif(10000, 0, 100)
 sigmasq.c.draws <- sigma.c.draws^2
 hist(sigmasq.c.draws, freq=FALSE, xlim=c(0, 200), nclass=1500, main="Prior C vs A", xlab=expression(sigma^2))
@@ -265,7 +289,7 @@ legend(20, 0.0035, c("Prior A", "Prior C"), fill=c("red", "white"), cex=0.5)
 \item \begin{enumerate}
 
 \item \begin{enumerate}
-\item The \verb+dtfolded+ function below calculates the density of a folded half t distribution with $4$ degrees of freedom and a scale of $1$.
+\item The \verb+dtfolded+ function below calculates the density of a folded half t distribution with \verb+df+ degrees of freedom and a scale of A.
 \begin{center}
 \begin{singlespace}
 <<density, echo=TRUE>>=
@@ -284,7 +308,7 @@ plot(x, dtfolded(x), type="l", main="Half-t density", lwd=2)
 \end{singlespace}
 \end{center}
 
-\item The \verb+rtfolded+ function below generates a random draw from the folded t distribution with $4$ degrees of freedom and scale parameter of $3$.
+\item The \verb+rtfolded+ function below generates a random draw from the folded t distribution with \verb+df+ degrees of freedom and scale parameter of A. 
 \begin{singlespace}
 \begin{center}
 <<randomdrawsfoldedt, echo=TRUE>>=
@@ -315,6 +339,7 @@ y_{ij} \sim N(\mu+\alpha_j, \sigma^2_y) \\
 
 \begin{singlespace}
 <<simulate, echo=TRUE>>=
+set.seed(10923)
  n.j <- c(5, 10, 30, 30, 20, 25, 50, 10)
  n.tot <- sum(n.j)
 
@@ -341,23 +366,39 @@ for(j in 1:J){
 @
 \end{singlespace}
 
-<<plotsims>>=
+<<plotsims, echo=FALSE>>=
  ### Plot the raw fake data ####
  boxplot(y.ij ~ school, col="gray", var.width=TRUE)
    points(school, y.ij)
    points(1:8, mu+alpha, col="red", cex=2, pch=20)
 @
 
-\item Priors:
+\item I chose an improper uniform prior for $\mu$, and improper uniform priors for $\sigma_y$ and $\sigma_{\alpha}$ under the constraint that these parameters are larger than $0$.
 \begin{align*}
-\mu \propto 1
+p(\mu) \propto 1 \\
+p(\sigma_y) \propto 1 I_{\sigma_y > 0}\\
+p(\sigma_{\alpha}) \propto 1 I_{\sigma_{\alpha} > 0}
 \end{align*}
 
-\item Fit the model in STAN
+\item I chose to use STAN to fit the models. I included model code in the appendix
 
-<<stanmodel, echo=FALSE, message=FALSE, results='hide'>>=
+\begin{enumerate}
+
+\item I chose $\epsilon = 1$ so that an $Inv-Gamma(1, 1)$ prior is used on $\sigma^2_{\alpha}$. Gelman uses this prior in the $2006$ prior, and although it appears to inform the posterior more than the improper uniform prior, it does not influence the posterior nearly as much as the $Gam(0.001, 0.001)$ prior. Additionally, I can't find a symmetric gamma prior that is more diffuse than the $Gam(1,1)$ that does not blow up at $0$. Gelman says he does not recommend using the Inv-Gam($\epsilon$, $\epsilon$) prior when the goal is to inform the posterior as little as  possible.
+
+\begin{center}
+<<plotdinvgam, echo=FALSE, message=FALSE>>=
+x <- seq(0, 50, by = 0.01)
+require(MCMCpack)
+plot(x, dinvgamma(x, 1, 1), type="l", main="Inv-Gamma(1,1) prior", xlab=expression(sigma[alpha]))
+@
+\end{center}
+I just chose a very large number for A, $A=10000$, with the goal of applying a very vague prior on $\sigma^2_{\alpha}$. Normally, I would choose an A that represents a mathematical constraint on the upper bound of $\sigma_{\alpha}$. For example, if I was using the schools example, I would say that a standard deviation of $100$ is a reasonable maximum in the context of SAT scores. But, because I am choosing A for a general hierarchical model with no context, it's hard to choose an upper bound to reflect a natural constraint.
+
+
+<<stanmodel, echo=FALSE, message=FALSE, include=FALSE, cache=TRUE, warning=FALSE>>=
 require(rstan)
-
+#recache please
 J <- 8
 y_1 <- y.ij[school=="A"]
 y_2 <- y.ij[school=="B"]
@@ -368,63 +409,350 @@ y_6 <- y.ij[school=="F"]
 y_7 <- y.ij[school=="G"]
 y_8 <- y.ij[school=="H"]
 
-basicmodel.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/basicmodel.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+basicmodel.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/basicmodel.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
 @
 
-\item 
 
-<<invgamma, echo=FALSE, cache=TRUE, results='hide'>>=
-invgamma.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/invgamma.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+<<invgamma, echo=FALSE, cache=TRUE, results='hide', warning=FALSE, include=FALSE>>=
+#recache please
+invgamma.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/invgamma.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
 @
 
-<<uniform, echo=FALSE, cache=TRUE, results='hide'>>=
-unif.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/properunif.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+<<uniform, echo=FALSE, cache=TRUE, results='hide', warning=FALSE, include=FALSE>>=
+#recacheplease
+unif.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/properunif.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
 @
 
-\item
+\item Here I compare the posterior distributions of $\sigma_{\alpha}$ obtained from the three priors. The improper uniform prior has the largest range of posterior draws. I would expect this, because it is the most diffuse prior. The $Inv-Gamma(1, 1)$ prior does appear to inform the posterior because the range of posterior draws is the narrowest for this prior. It turns out the $Inv-Gamma(1,1)$ prior is closer to being centered on the true $\sigma_{\alpha}$, $\sqrt{2}$, than any of the other priors. I think this occured by coincidence; the inverse gamma prior happened to put more on values of $\sigma_{\alpha}$ closer to the truth. This was not intentional, however, and I don't think the $Inv-Gam(1,1)$ prior should be thought of as non-informative.
 
-<<plotpost, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+<<plotpost, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
 par(mfrow=c(1,3))
-hist(extract(basicmodel.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="Improper Uniform Prior")
+require(rstan)
+require(coda)
+hist(extract(basicmodel.fit)$sigma_alpha, nclass=50, main="Improper Uniform Prior", xlab=expression(sigma[alpha]))
+abline(v=1.414, lwd=2, col="red")
 
-hist(extract(invgamma.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="InvGamma(1, 1) Prior")
+hist(extract(invgamma.fit)$sigma_alpha, nclass=50, main="InvGamma(1, 1) Prior", xlab=expression(sigma[alpha]))
+abline(v=1.414, lwd=2, col="red")
 
-hist(extract(unif.fit)$sigma_alpha, nclass=50, xlab="sigma_alpha", main="Unif(0, 10000) Prior")
+hist(extract(unif.fit)$sigma_alpha, nclass=50, main="Unif(0, 10000) Prior", xlab=expression(sigma[alpha]))
+abline(v=1.414, lwd=2, col="red")
 @
 
-\item 
+\item When looking at the posterior distributions for $\mu$ obtained from the three priors, I noticed they are all centered around $20.5$, just to the right of the true mean of $20$. Results were fairly similar across all three prior distributions, but again we see that the spread of posterior draws for $\mu$ was widest when the uniform priors were used.
 
 <<plotmupost, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 par(mfrow=c(1,3))
-hist(extract(basicmodel.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of mu Improper Uniform Prior")
+hist(extract(basicmodel.fit)$mu, nclass=50, xlab=expression(mu), main="Improper Uniform Prior")
+abline(v=20, lwd=2, col="red")
 
-hist(extract(invgamma.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of alpha_sigma InvGamma(1, 1) Prior")
+hist(extract(invgamma.fit)$mu, nclass=50, xlab=expression(mu), main="InvGamma(1, 1) Prior")
+abline(v=20, lwd=2, col="red")
 
-hist(extract(unif.fit)$mu, nclass=50, xlab=expression(mu), main="Posterior of alpha_sigma Unif(0, 10000) Prior")
+hist(extract(unif.fit)$mu, nclass=50, xlab=expression(mu), main="Unif(0, 10000) Prior")
+abline(v=20, lwd=2, col="red")
 @
 
-\item 
-<<reparam, echo=FALSE, cache=TRUE, results='hide'>>=
+\end{enumerate}
+
+\item The folded $N(0, 100)$ prior has a wider range of posterior draws for $\sigma_{\alpha}$ than the folded Cauchy. The range of posterior $\mu$ values is also slightly larger for the folded $N(0, 100)$. Both posterior distributions for $\mu$ look very similar to the posteriors from all priors in part (e). The posterior for $\sigma_{\alpha}$ from the half Cauchy looks similar to the posterior in part (e) from the inverse Gamma prior. The posterior for $\sigma_{\alpha}$ from the folded normal prior looks similar to the posterior from the uniform priors in (e).
+<<reparam, echo=FALSE, cache=TRUE, results='hide', include=FALSE>>=
 sigma_eta <- 1
-reparam.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparam.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J", "sigma_eta"), iter=1000, chains=4)
+#recache please
+reparam.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparam.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J", "sigma_eta"), iter=10000, chains=4)
 @
 
-<<compare3, echo=FALSE, out.width="\\linewidth">>=
+<<compare3, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 par(mfrow=c(1,2))
-hist(extract(reparam.fit)$psi*extract(reparam.fit)$sigma_eta, nclass=50, xlab="sigma_alpha", main="Folded Normal Prior")
+hist(extract(reparam.fit)$psi*sigma_eta, nclass=50, xlab=expression(sigma[alpha]), main="Folded Normal(0,100) Prior")
+abline(v=1.414, lwd=2, col="red")
 
-hist(extract(reparam.fit)$mu, nclass=50, xlab="mu", main="Folded Normal Prior")
+hist(extract(reparam.fit)$mu, nclass=50, xlab="mu", main="Folded Normal Prior (0, 100)")
+abline(v=20, lwd=2, col="red")
 @
 
-<<reparamcauchy, echo=FALSE, cache=TRUE, results='hide'>>=
-reparamcauchy.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparamcauchy.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=1000, chains=4)
+<<reparamcauchy, echo=FALSE, cache=TRUE, results='hide', include=FALSE>>=
+#recache please
+reparamcauchy.fit <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparamcauchy.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
 @
 
-<<compare4, echo=FALSE, out.width="\\linewidth">>=
+<<compare4, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 par(mfrow=c(1,2))
-hist(extract(reparamcauchy.fit)$sigma_eta*extract(reparamcauchy.fit)$psi, nclass=50, xlab="sigma_alpha", main="Half Cauchy Prior")
+hist(extract(reparamcauchy.fit)$sigma_eta*extract(reparamcauchy.fit)$psi, nclass=50, xlab=expression(sigma[alpha]), main="Half Cauchy Prior")
+abline(v=1.414, lwd=2, col="red")
 
 hist(extract(reparamcauchy.fit)$mu, nclass=50, xlab="mu", main="Half Cauchy Prior")
+abline(v=20, lwd=2, col="red")
+@
+
+\end{enumerate}
+
+\item The new simulated data are shown below. I fit the same models as I did in problem $3$ parts (e) and (f).
+
+\begin{singlespace}
+<<simulate4, echo=FALSE>>=
+set.seed(10923)
+ n.j <- c(5, 10, 30, 30, 20, 25, 50, 10)
+ n.tot <- sum(n.j)
+
+ J <- 8
+ sigma.y <- 2
+
+ mu <- 20
+ sigma4.alpha <- 0.1
+
+alpha4 <- numeric(J)
+for(j in 1:J){
+  alpha4[j] <- rnorm(1, 0, sd=sigma4.alpha)
+}
+ 
+ set.seed(2567)
+ y4.ij <- numeric(n.tot)
+ school <- rep(NA,n.tot)
+ n.index <- c(0, cumsum(n.j)) +1
+ for (j in 1:J) {
+   y4.ij[n.index[j]:(n.index[j+1]-1)] <- rnorm(n.j[j], mean=mu+alpha4[j], sd=sigma.y)
+   school[n.index[j]:(n.index[j+1]-1)] <- rep(LETTERS[j], n.j[j])
+ }
+ school <- factor(school)
+@
+\end{singlespace}
+
+<<plot4sims, echo=FALSE>>=
+ ### Plot the raw fake data ####
+ boxplot(y4.ij ~ school, col="gray", var.width=TRUE)
+   points(school, y4.ij)
+   points(1:8, mu+alpha4, col="red", cex=2, pch=20)
+@
+
+<<stanmodel4, echo=FALSE, message=FALSE, include=FALSE, cache=TRUE, warning=FALSE>>=
+require(rstan)
+#recache please
+J <- 8
+y_1 <- y4.ij[school=="A"]
+y_2 <- y4.ij[school=="B"]
+y_3 <- y4.ij[school=="C"]
+y_4 <- y4.ij[school=="D"]
+y_5 <- y4.ij[school=="E"]
+y_6 <- y4.ij[school=="F"]
+y_7 <- y4.ij[school=="G"]
+y_8 <- y4.ij[school=="H"]
+
+basicmodel.fit4 <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/basicmodel.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
+@
+
+
+<<invgamma4, echo=FALSE, cache=TRUE, results='hide', warning=FALSE, include=FALSE>>=
+#recache please
+invgamma.fit4 <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/invgamma.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
+@
+
+<<uniform4, echo=FALSE, cache=TRUE, results='hide', warning=FALSE, include=FALSE>>=
+#recacheplease
+unif.fit4 <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/properunif.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
+@
+
+<<reparam4, echo=FALSE, cache=TRUE, results='hide', include=FALSE>>=
+sigma_eta <- 1
+#recache please
+reparam.fit4 <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparam.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J", "sigma_eta"), iter=10000, chains=4)
+@
+
+<<reparamcauchy4, echo=FALSE, cache=TRUE, results='hide', include=FALSE>>=
+#recache please
+reparamcauchy.fit4 <- stan(file="~/Documents/Stat532/homeworks/bayeshw9/reparamcauchy.stan", data=c("y_1", "y_2","y_3","y_4","y_5","y_6","y_7","y_8","J"), iter=10000, chains=4)
+@
+
+
+Below I plot the posterior distributions for $\mu$ and $\sigma_{\alpha}$ for the different priors. 
+
+<<plotpost4, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
+par(mfrow=c(2,3))
+require(rstan)
+require(coda)
+hist(extract(basicmodel.fit4)$sigma_alpha, nclass=50, main="Improper Uniform Prior", xlab=expression(sigma[alpha]))
+abline(v=0.1, lwd=2, col="red")
+
+hist(extract(invgamma.fit4)$sigma_alpha, nclass=50, main="InvGamma(1, 1) Prior", xlab=expression(sigma[alpha]))
+abline(v=0.1, lwd=2, col="red")
+
+hist(extract(unif.fit4)$sigma_alpha, nclass=50, main="Unif(0, 10000) Prior", xlab=expression(sigma[alpha]))
+abline(v=0.1, lwd=2, col="red")
+
+hist(extract(reparam.fit4)$psi*sigma_eta, nclass=50, xlab=expression(sigma[alpha]), main="Folded Normal(0,100) Prior")
+abline(v=0.1, lwd=2, col="red")
+
+hist(extract(reparamcauchy.fit4)$sigma_eta*extract(reparamcauchy.fit)$psi, nclass=50, xlab=expression(sigma[alpha]), main="Half Cauchy Prior")
+abline(v=0.1, lwd=2, col="red")
+@
+
+
+<<plotmupost4, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(2,3))
+hist(extract(basicmodel.fit4)$mu, nclass=50, xlab=expression(mu), main="Improper Uniform Prior")
+abline(v=20, lwd=2, col="red")
+
+hist(extract(invgamma.fit4)$mu, nclass=50, xlab=expression(mu), main="InvGamma(1, 1) Prior")
+abline(v=20, lwd=2, col="red")
+
+hist(extract(unif.fit4)$mu, nclass=50, xlab=expression(mu), main="Unif(0, 10000) Prior")
+abline(v=20, lwd=2, col="red")
+
+hist(extract(reparam.fit4)$mu, nclass=50, xlab="mu", main="Folded Normal Prior (0, 100)")
+abline(v=20, lwd=2, col="red")
+
+hist(extract(reparamcauchy.fit4)$mu, nclass=50, xlab="mu", main="Half Cauchy Prior")
+abline(v=20, lwd=2, col="red")
+@
+
+\begin{enumerate}
+
+\item For all priors, the spreads of the posterior distributions for $\mu$ in problem $4$ are smaller than problem $3$. The posteriors for $\mu$ are still similar across priors, although the folded normal and improper uniform priors still have a wider range of values. \\
+
+The posteriors for $\sigma_{\alpha}$ look very different than they did in problem $3$. Most of them are bumped up against $0$ and centered around $0.5$, quite far from the true value of $0.1$. All of the posteriors have a long right tail, and if the variability were any lower the posterior distributions may turn out to be improper. This is similar to what Gelman points out in section $5$ of his $2006$ paper when the number of groups is small (J=3 rather than J=8), that if the variability among groups is small, or if the number of groups is small, the posterior distributions could turn out to be improper or very sensitive to the prior. In this case, the posteriors for $\sigma_{\alpha}$ end up overestimating the group to group variability because the vague priors used give more density to higher values of $\sigma_{\alpha}$. Gelman says that this is unavoidable due to the asymmetry of the parameter space, but he recommends using the half Cauchy when the variability among groups is low. I do think the results from the half Cauchy look the best, but the posterior draws are still large compared to the true magnitude of $\sigma_{\alpha}$.
+
+
+%These posterior distributions severely overestimate the variability among the groups, and I'm not sure I'd be comfortable using them for inference.    
+
+\item See caterpillar plots on the next page. In problem $3$, the degree is shrinkage is largest for the inverse gamma prior. I would expect this because the inverse gamma prior puts more density on lower values of $\sigma_{\alpha}$. In the case of problem $4$, however, the degree of shrinkage is largest for the improper uniform prior. I think this occurs because the density of the inverse gamma prior is concentrated above $0.5$. So, in this case, the improper uniform actually has more density on lower values of $\sigma_{\alpha}$ than the inverse gamma prior, resulting in more shrinkage for the improper uniform prior.
+
+The other thing I notice is that there is much more shrinkage overall in the results from problem $4$, but the shrinkage should be more in problem $4$ considering the true standard deviation among groups is only $0.1$. \\
+
+If we were testing for variability among the groups using classical methods, we would find no evidence of variability in problem $4$, but in problem $3$, we would find evidence of variability among the groups. We talked in class about how, with a Bayesian analysis, we don't have to choose between a separate means or a single mean model. But, in problem $4$, the model greatly overestimates the variability among the groups and this seems to be unavoidable. When the variability among groups is small and we know there will be difficulties in estimating the group to group variability, would it be better to use the Bayesian model even though it overestimates variability among groups, or would it be better just to use a single mean model?
+
+<<caterpillarplot4, echo=FALSE, out.width="\\linewidth", fig.width=6>>=
+#improper uniform
+schools.sim4 <- extract(basicmodel.fit4, permuted=TRUE) #combines chains and permutes values, after warmup
+#names(schools.sim)
+
+#dim(schools.sim$theta)
+post.theta <- schools.sim4$theta
+post.int.1 <- apply(post.theta, 2, function(x) quantile(x,c(0.025,0.975)))
+post.int.2 <- apply(post.theta, 2, function(x) quantile(x,c(0.16,0.84)))
+post.int.3 <- apply(post.theta, 2, function(x) quantile(x,c(0.005,0.995)))
+post.mean <- apply(post.theta, 2, mean)
+post.median <- apply(post.theta, 2 ,median)
+
+#inverse gamma
+t.schools.sim4<- extract(invgamma.fit4, permuted=TRUE) #combines chains and permutes values, after warmup
+
+#dim(t.schools.sim$theta)
+t.post.theta <- t.schools.sim4$theta
+t.post.int.1 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.025,0.975)))
+t.post.int.2 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.16,0.84)))
+t.post.int.3 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.005,0.995)))
+t.post.mean <- apply(t.post.theta, 2, mean)
+t.post.median <- apply(t.post.theta, 2 ,median)
+
+
+plot(seq(min(post.int.3[1,])-0.5, max(post.int.3[2,])+0.5,length=8), seq(0.25,8.75,length=8), type="n", xlab=" ", ylab=" ",yaxt="n") 
+      mtext(c("A","B","C","D","E","F","G","H"), side=2, at=1:8, line=1,las=2)
+      
+       abline(h=seq(1.5,7.5,by=1), lty=2)
+       abline(v=mean(schools.sim4$mu), col="red")
+       abline(v=mean(t.schools.sim4$mu), col="purple")
+
+avg.A <- mean(y_1)
+avg.B <- mean(y_2)
+avg.C <- mean(y_3)
+avg.D <- mean(y_4)
+avg.E <- mean(y_5)
+avg.F <- mean(y_6)
+avg.G <- mean(y_7)
+avg.H <- mean(y_8)
+avgs <- c(avg.A, avg.B, avg.C, avg.D, avg.E, avg.F, avg.G, avg.H)
+
+ ### Bayesian hierarchical model - improper uniform prior
+      segments(post.int.3[1,], (1:8)+0.25, post.int.3[2,], (1:8)+0.25, lwd=1, col=1)
+      segments(post.int.1[1,], (1:8)+0.25, post.int.1[2,], (1:8)+0.25, lwd=3, col="orange")
+      segments(post.int.2[1,], (1:8)+0.25, post.int.2[2,], (1:8)+0.25, lwd=5, col="red") 
+      points(post.mean, (1:8)+0.25, pch="|", cex=1.2, col=1)
+      points(post.median, (1:8)+0.25, pch="|", cex=1.2, col=1)
+  points(avgs, (1:8), pch=16)
+
+
+ ### Bayesian hierarchical model - inverse gamma prior
+      
+      segments(t.post.int.3[1,], (1:8)-0.25, t.post.int.3[2,], (1:8)-0.25, lwd=1, col=1)
+      segments(t.post.int.1[1,], (1:8)-0.25, t.post.int.1[2,], (1:8)-0.25, lwd=3, col="magenta")
+      segments(t.post.int.2[1,], (1:8)-0.25, t.post.int.2[2,], (1:8)-0.25, lwd=5, col="black") 
+      points(t.post.mean, (1:8)-0.25, pch="|", cex=1.2, col=1)
+      points(t.post.median, (1:8)-0.25, pch="|", cex=1.2, col=1)
+
+legend(18, 3, bty="n", legend=c("Improper Uniform", "Inverse Gamma(1, 1)"), lwd=c(5,5), col=c("red","black"), cex=0.777)
+@
+
+\item Below is the caterpillar plot from problem $3$. See part (b) for my discussion.
+
+<<caterpillarplot3, echo=FALSE, out.width="\\linewidth", fig.width=6>>=
+#improper uniform
+schools.sim <- extract(basicmodel.fit, permuted=TRUE) #combines chains and permutes values, after warmup
+#names(schools.sim)
+
+#dim(schools.sim$theta)
+post.theta <- schools.sim$theta
+post.int.1 <- apply(post.theta, 2, function(x) quantile(x,c(0.025,0.975)))
+post.int.2 <- apply(post.theta, 2, function(x) quantile(x,c(0.16,0.84)))
+post.int.3 <- apply(post.theta, 2, function(x) quantile(x,c(0.005,0.995)))
+post.mean <- apply(post.theta, 2, mean)
+post.median <- apply(post.theta, 2 ,median)
+
+#inverse gamma
+t.schools.sim <- extract(invgamma.fit, permuted=TRUE) #combines chains and permutes values, after warmup
+
+#dim(t.schools.sim$theta)
+t.post.theta <- t.schools.sim$theta
+t.post.int.1 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.025,0.975)))
+t.post.int.2 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.16,0.84)))
+t.post.int.3 <- apply(t.post.theta, 2, function(x) quantile(x,c(0.005,0.995)))
+t.post.mean <- apply(t.post.theta, 2, mean)
+t.post.median <- apply(t.post.theta, 2 ,median)
+
+
+plot(seq(min(post.int.3[1,])-0.5, max(post.int.3[2,])+0.5,length=8), seq(0.25,8.75,length=8), type="n", xlab=" ", ylab=" ",yaxt="n") 
+      mtext(c("A","B","C","D","E","F","G","H"), side=2, at=1:8, line=1,las=2)
+      
+       abline(h=seq(1.5,7.5,by=1), lty=2)
+       abline(v=mean(schools.sim$mu), col="red")
+       abline(v=mean(t.schools.sim$mu), col="purple")
+
+y_1 <- y.ij[school=="A"]
+y_2 <- y.ij[school=="B"]
+y_3 <- y.ij[school=="C"]
+y_4 <- y.ij[school=="D"]
+y_5 <- y.ij[school=="E"]
+y_6 <- y.ij[school=="F"]
+y_7 <- y.ij[school=="G"]
+y_8 <- y.ij[school=="H"]
+
+avg.A <- mean(y_1)
+avg.B <- mean(y_2)
+avg.C <- mean(y_3)
+avg.D <- mean(y_4)
+avg.E <- mean(y_5)
+avg.F <- mean(y_6)
+avg.G <- mean(y_7)
+avg.H <- mean(y_8)
+avgs <- c(avg.A, avg.B, avg.C, avg.D, avg.E, avg.F, avg.G, avg.H)
+
+ ### Bayesian hierarchical model - improper uniform prior
+      segments(post.int.3[1,], (1:8)+0.25, post.int.3[2,], (1:8)+0.25, lwd=1, col=1)
+      segments(post.int.1[1,], (1:8)+0.25, post.int.1[2,], (1:8)+0.25, lwd=3, col="orange")
+      segments(post.int.2[1,], (1:8)+0.25, post.int.2[2,], (1:8)+0.25, lwd=5, col="red") 
+      points(post.mean, (1:8)+0.25, pch="|", cex=1.2, col=1)
+      points(post.median, (1:8)+0.25, pch="|", cex=1.2, col=1)
+  points(avgs, (1:8), pch=16)
+
+
+ ### Bayesian hierarchical model - inverse gamma prior
+      
+      segments(t.post.int.3[1,], (1:8)-0.25, t.post.int.3[2,], (1:8)-0.25, lwd=1, col=1)
+      segments(t.post.int.1[1,], (1:8)-0.25, t.post.int.1[2,], (1:8)-0.25, lwd=3, col="magenta")
+      segments(t.post.int.2[1,], (1:8)-0.25, t.post.int.2[2,], (1:8)-0.25, lwd=5, col="black") 
+      points(t.post.mean, (1:8)-0.25, pch="|", cex=1.2, col=1)
+      points(t.post.median, (1:8)-0.25, pch="|", cex=1.2, col=1)
+
+legend(16.5, 3, bty="n", legend=c("Improper Uniform", "Inverse Gamma(1, 1)"), lwd=c(5,5), col=c("red","black"), cex=0.777)
 @
 
 \end{enumerate}
@@ -432,5 +760,221 @@ hist(extract(reparamcauchy.fit)$mu, nclass=50, xlab="mu", main="Half Cauchy Prio
 \end{enumerate}
 
 \end{doublespacing}
+
+
+
+{\bf \Large R Code Appendix - STAN model code}
+
+<<basicmodela, eval=FALSE>>=
+###improper uniform prior
+data {
+  int J; 
+  real y_1[5]; 
+  real y_2[10];
+  real y_3[30];
+  real y_4[30];
+  real y_5[20];
+  real y_6[25];
+  real y_7[50];
+  real y_8[10];
+}
+
+parameters {
+  real mu; 
+  real<lower=0> sigma_alpha;
+  real<lower=0> sigma_y;
+  real alpha[J];
+}
+
+transformed parameters {
+  real theta[J];
+  for (j in 1:J)
+    theta[j] <- mu + alpha[j];
+}
+
+model {
+  alpha ~ normal(0, sigma_alpha);
+  
+  y_1 ~ normal(theta[1], sigma_y);
+  y_2 ~ normal(theta[2], sigma_y);
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
+}
+@
+
+<<invgammaa, eval=FALSE>>=
+#inverse gamma prior
+data {
+  int J; 
+  real y_1[5]; 
+  real y_2[10];
+  real y_3[30];
+  real y_4[30];
+  real y_5[20];
+  real y_6[25];
+  real y_7[50];
+  real y_8[10];
+}
+
+parameters {
+  real mu; 
+  real<lower=0> sigma_alpha;
+  real<lower=0> sigma_y;
+  real alpha[J];
+}
+
+transformed parameters {
+  real theta[J];
+  for (j in 1:J)
+    theta[j] <- mu + alpha[j];
+}
+
+model {
+  sigma_alpha ~ inv_gamma(1, 1);
+  alpha ~ normal(0, sigma_alpha);
+  
+  y_1 ~ normal(theta[1], sigma_y);
+  y_2 ~ normal(theta[2], sigma_y);
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
+}
+@
+
+<<properunifa, eval=FALSE>>=
+#proper uniform prior
+data {
+  int J; 
+  real y_1[5]; 
+  real y_2[10];
+  real y_3[30];
+  real y_4[30];
+  real y_5[20];
+  real y_6[25];
+  real y_7[50];
+  real y_8[10];
+}
+
+parameters {
+  real mu; 
+  real<lower=0> sigma_alpha;
+  real<lower=0> sigma_y;
+  real alpha[J];
+}
+
+transformed parameters {
+  real theta[J];
+  for (j in 1:J)
+    theta[j] <- mu + alpha[j];
+}
+
+model {
+  sigma_alpha ~ uniform(0, 10000);
+  alpha ~ normal(0, sigma_alpha);
+  
+  y_1 ~ normal(theta[1], sigma_y);
+  y_2 ~ normal(theta[2], sigma_y);
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
+}
+@
+
+<<reparama, eval=FALSE>>=
+#reparameterized with folded normal prior
+data {
+  real sigma_eta;
+  int J; 
+  real y_1[5]; 
+  real y_2[10];
+  real y_3[30];
+  real y_4[30];
+  real y_5[20];
+  real y_6[25];
+  real y_7[50];
+  real y_8[10];
+}
+
+parameters {
+  real mu; 
+  real<lower=0> psi;
+  real<lower=0> sigma_y;
+  real eta[J];
+}
+
+transformed parameters {
+  real theta[J];
+  for (j in 1:J)
+    theta[j] <- mu + psi * eta[j];
+}
+
+model {
+  eta ~ normal(0, sigma_eta);
+  psi ~ normal(0, 100);     
+  y_1 ~ normal(theta[1], sigma_y);
+  y_2 ~ normal(theta[2], sigma_y);
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
+}
+@
+
+<<reparamaa, eval=FALSE>>=
+#reparameterized folded Cauchy
+data {
+  int J; 
+  real y_1[5]; 
+  real y_2[10];
+  real y_3[30];
+  real y_4[30];
+  real y_5[20];
+  real y_6[25];
+  real y_7[50];
+  real y_8[10];
+}
+
+parameters {
+  real mu; 
+  real<lower=0> psi;
+  real<lower=0> sigma_y;
+  real eta[J];
+  real<lower=0> sigma_eta;
+}
+
+transformed parameters {
+  real theta[J];
+  for (j in 1:J)
+    theta[j] <- mu + psi * eta[j];
+}
+
+model {
+  eta ~ normal(0, sigma_eta);
+  psi ~ normal(0, 1);
+  sigma_eta ~ normal(0, 1);
+  y_1 ~ normal(theta[1], sigma_y);
+  y_2 ~ normal(theta[2], sigma_y);
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
+}
+@
+
+
 
 \end{document}

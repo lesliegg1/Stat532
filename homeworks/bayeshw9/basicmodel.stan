@@ -28,10 +28,10 @@ model {
   
   y_1 ~ normal(theta[1], sigma_y);
   y_2 ~ normal(theta[2], sigma_y);
-  y_2 ~ normal(theta[3], sigma_y);
-  y_3 ~ normal(theta[4], sigma_y);
-  y_4 ~ normal(theta[5], sigma_y);
-  y_5 ~ normal(theta[6], sigma_y);
-  y_6 ~ normal(theta[7], sigma_y);
-  y_7 ~ normal(theta[8], sigma_y); 
+  y_3 ~ normal(theta[3], sigma_y);
+  y_4 ~ normal(theta[4], sigma_y);
+  y_5 ~ normal(theta[5], sigma_y);
+  y_6 ~ normal(theta[6], sigma_y);
+  y_7 ~ normal(theta[7], sigma_y);
+  y_8 ~ normal(theta[8], sigma_y); 
 }

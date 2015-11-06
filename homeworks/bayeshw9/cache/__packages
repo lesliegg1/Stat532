@@ -1,11 +1,12 @@
-base
-knitr
-gdata
 LearnBayes
-coda
-xtable
 MASS
 MCMCpack
 Rcpp
+base
+coda
+gdata
 ggplot2
+knitr
+lattice
 rstan
+xtable

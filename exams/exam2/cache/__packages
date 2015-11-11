@@ -1,0 +1,12 @@
+base
+knitr
+coda
+rjags
+R2jags
+MASS
+Matrix
+lme4
+arm
+Rcpp
+ggplot2
+rstan

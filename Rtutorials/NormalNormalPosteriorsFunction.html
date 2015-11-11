@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<p>mu.post.fun &lt;- function(prior.mean, prior.sd, ybar, n, data.sd=1, x.lo, x.hi, ymax=1.4) {<br />&nbsp; post.prec &lt;- (1/(prior.sd)^2) + (n/(data.sd^2))<br />&nbsp; post.mean &lt;- ((prior.mean/(prior.sd^2)) + ((ybar*n)/(data.sd^2)))/(post.prec)<br />&nbsp; post.sd &lt;- sqrt(1/post.prec)<br />&nbsp; post.int &lt;- qnorm(c(.05,.95), mean=post.mean, sd=post.sd)<br />&nbsp; cat("posterior mean=", post.mean, "\n")<br />&nbsp; cat("90% posterior interval = ", post.int, "\n")<br />&nbsp; #return(c(post.mean,post.int))<br />&nbsp; curve(dnorm(x,mean=prior.mean, sd=prior.sd), col="red", from=x.lo, to=x.hi, ylim=c(0,ymax), lwd=2,<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ylab="density", xlab=expression(mu))<br />&nbsp; curve(dnorm(x,mean=ybar, sd=data.sd/sqrt(n)), add=TRUE, col="blue", lwd=2)<br />&nbsp; curve(dnorm(x,mean=post.mean, sd=post.sd), add=TRUE,&nbsp; col="purple", lwd=4)<br />&nbsp; legend(x.lo, ymax, legend=c("Sampling Dist'n", "Prior","Posterior"), <br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; lwd=c(2,2,4), col=c("blue","red","purple"), bty="n")<br />}</p>
+<p></p>
+<p>mu.post.fun(19, 5, ybar=y.bar, n=12, data.sd=10, x.lo=5, x.hi=35, ymax=0.5)</p>
+</body>
+</html>

@@ -102,6 +102,8 @@ contour(m, pi, lik.mat, levels=seq(0.05, 0.95, 0.25), xlim=c(20, 230),
 points(grid.max[1], grid.max[2], col="red", pch=16, cex=2)
 @
 
+\item
+
 \item \begin{enumerate}
 
 \item The joint posterior distribution of $(m, \pi)$ is shown below.
@@ -286,6 +288,7 @@ y_i &\sim Bin(m, \pi) \\
 \pi &\sim Beta(\frac{\eta}{\sigma^2}, \frac{1-\eta}{\sigma^2}) \\
 \sigma &\sim Uniform(0, 100) \\
 \eta &\sim Uniform(0, 1) \\
+m &\sim Poisson(\lambda)
 \lambda &\sim Uniform(0, 500)
 \end{align*}
 
@@ -377,14 +380,53 @@ hist(eta.draws, main=expression(eta), freq=FALSE, xlab=expression(eta))
 abline(v=0.5, lwd=3, col="red")
 @
 
-\item
+\item \begin{enumerate}
+
+\item When I first looked at this prior, I thought he was trying to give higher density to values of $\mu$ and $\pi$ that yield smaller numbers of successes. But, on second thought, I think he was just trying to specify a vague prior over the entire range of possible expected observations. I do think he was trying to get at a non-informative prior. 
+ 
+\item When I look at the plot of the Raftery Prior, it looks like small values of $\mu$ with any value of $\pi$ are most probable. When I generated draws from the priors I specified in (i), however, it looks like values of $\mu$ between $0$ and $500$ are equally likely, with $\pi$ either very close to $0$ or very close to $1$. It seems like the raftery prior makes lower expected number of observations most probable by making lower values of $\lambda$, and thus $m$, more probable. The prior used in $i$ makes values of $\lambda$ between $0$ and $500$ equally likely, and values of $\pi$ close to $0$ or $1$ are most likely across all values of $\lambda$. I included the code for this part in the appendix. 
+
+<<drawfrommultiprior, echo=FALSE, cache=TRUE, out.width="0.8\\linewidth", fig.width=8>>=
+set.seed(908)
+pi.draw <- numeric(1000)
+mu.draw <- numeric(1000)
+lambda.draw <- numeric(1000)
+for(i in 1:1000){
+  lambda.draw[i] <- runif(1, 0, 500)
+  m.draw <- rpois(1, lambda.draw)
+
+  sigma.draw <- runif(1, 0, 100)
+  eta.draw <- runif(1, 0, 1)
+  pi.draw[i] <- rbeta(1, eta.draw/sigma.draw^2, (1-eta.draw)/sigma.draw^2)
+}
+
+lambda.vals <- seq(0, 100, length=1000)
+pi.vals <- seq(0, 1, length=1000)
+mu.vals <- lambda.vals*pi.vals
+mu.pi.vals <- expand.grid(mu.vals, pi.vals)
+mu.pi.vals <- as.matrix(mu.pi.vals)
+prior.vals.fun <- function(mu.pi){
+  1/mu.pi[1]
+} 
+
+prior.vals <- apply(mu.pi.vals, 1, prior.vals.fun)
+
+prior.mat <- matrix(prior.vals, nrow=length(mu.vals), ncol=length(pi.vals))
+
+contour(lambda.vals, pi.vals, prior.mat, levels=seq(0.05, 0.95, 0.25), 
+        xlab=expression(lambda), ylab=expression(pi), main="Raftery Prior vs. Prior (i)", 
+        lwd=3, col="red", xlim = c(0, 500))
+points(lambda.draw, pi.draw, col="black", pch=16)
+
+legend(20, 0.6, bty="n", legend=c("Raftery Prior", "Prior (i)"),
+       fill=c("red", "black"), cex=0.8)
+
+@
+
 
 \end{enumerate}
 
-<<readdata, echo=FALSE>>=
-setwd("~/Documents/Stat532/exams/exam2")
-frog.data <- read.csv("FrogDoseData.csv")
-@
+\end{enumerate}
 
 \item \begin{enumerate}
 
@@ -394,10 +436,13 @@ y_{ij} \sim& Bin(5, \pi_j) \\
 logit(\pi_j) &= \alpha + \beta x_j
 \end{align*}
 
-\begin{center}
+<<readdata, echo=FALSE>>=
+setwd("~/Documents/Stat532/exams/exam2")
+frog.data <- read.csv("FrogDoseData.csv")
+@
+
 <<glmmodel, echo=FALSE, message=FALSE>>=
 glm.fit <- glm(death ~ dose, data = frog.data, family = "binomial")
-
 require(arm)
 
 dose1 <- with(frog.data, sum(death[dose==0.42])/5)
@@ -416,13 +461,12 @@ curve(invlogit(coefs[1] + coefs[2]*x),
 lwd=2, col=2, add=TRUE)
 points(unique(frog.data$dose), emp.probs, pch=15, cex=1.5)
 @
-\end{center}
 
 \item The model I will use to do the analysis in a Bayesian framework is shown below. 
 \begin{align*}
 y_{ij} &\sim Bern(logit^{-1}(\alpha + \beta x_j)) \\
-\alpha &\propto 1 \\
-\beta &\propto 1
+p(\alpha) &\propto 1 \\
+p(\beta) &\propto 1
 \end{align*}
 
 \item The model code is shown below.
@@ -454,16 +498,16 @@ samp2 <- sampling(model2, chains = 4, iter = 2000, data = data)
 
 \item The posterior draws for the y-intercept ($\alpha$) and the dose effect ($\beta$) are shown below. The red line indicates the estimate from the above generalized linear model.
 
-<<compare, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+<<compare, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
 par(mfrow=c(1,2))
+require(rstan)
+alpha.bad <- extract(samp2)$alpha
 
-alpha <- extract(samp2)$alpha
-
-hist(alpha, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha))
+hist(alpha.bad, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha))
 abline(v=coefs[1], col="red", lwd=3)
 
-beta <- extract(samp2)$beta
-hist(beta, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
+beta.bad <- extract(samp2)$beta
+hist(beta.bad, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
 abline(v=coefs[2], col="red", lwd=3)
 @
 
@@ -495,16 +539,229 @@ hist(beta, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
 abline(v=coefs[2], col="red", lwd=3)
 @
 
-\item 
+\item The cauchy priors are shown below. For the intercept, the $Cauchy(0, 10)$ prior allows for the possibility of any value over the whole real line, but the probable values for the intercept are between $-30$ and $30$. This is a huge spread on the logit scale, and if we transform back to the original scale, this prior allows for the probability of death at the average dose to be between $logit^{-1}(-30) = 9.4*10^{-14}$ and $logit^{-1}(30) \approx 1$! With such a large spread on the original scale, this prior is weakly informative because it incorporates the natural constraints that the probability of death must be between $0$ and $1$. \\
+
+For the slope, the probable prior values are between $-20$ and $20$ on the logit scale. This means that for a one standardized unit increase of dose, the odds of death can change by a multiplicative factor between the values of $e^{-10} = 4.54*10^{-5}$ and $e^{10} = 22026.5$. With the prior density spread out over such a large range over values, very little prior is incorporated about the dose effect. It does incorporate the natural constraint that the change in the odds must be greater than $0$. For this parameter, I think we could do a better job at incorporating the prior knowledge that $\beta > 0$ (it's a lethal toxin). I come up with a better weakly informative prior in part (i).  
 
 <<dcauchy, echo=FALSE>>=
-dcauchy(1, 0, 10)
+x <- seq(-60, 60, by = 0.01)
+plot(x, dcauchy(x, 0, 10), type="l", xlab="", main="Cauchy", ylim=c(0, 0.13), lwd=2, lty=2)
+lines(x, dcauchy(x, 0, 2.5), col="red", lwd=2)
+legend(-60, 0.08, c("Cauchy(0, 10)", "Cauchy(0, 2.5)"), col=c("black", "red"), lty=c(2,1))
+@
+
+\item The posterior distributions of $\alpha$ and $\beta$ are shown below. The regression lines displaying the fitted logits, and the fitted probability curves are shown for all $4000$ posterior draws are also shown.
+
+talk about differences...
+
+<<cauchystanfit, echo=FALSE, message=FALSE, cache=TRUE, results='hide'>>=
+require(rstan)
+set.seed(232364)
+data <- with(frog.data, list(y = death, x = dose, N = length(death)))
+
+model2.cauchy <- stan_model(file = "~/Documents/Stat532/exams/exam2/model2cauchy.stan", 
+                     model_name = "model2.cauchy")
+samp2.cauchy <- sampling(model2.cauchy, chains = 4, iter = 2000, data = data)
+@
+
+<<compare4, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
+par(mfrow=c(1,2))
+require(rstan)
+alpha <- extract(samp2.cauchy)$alpha
+
+hist(alpha, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha))
+abline(v=coefs[1], col="red", lwd=3)
+
+beta <- extract(samp2.cauchy)$beta
+hist(beta, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
+abline(v=coefs[2], col="red", lwd=3)
+@
+
+<<plotreglines, echo=FALSE, out.width="\\linewidth", fig.width=10, cache=TRUE>>=
+ld50 <- (0.5 - alpha)/beta
+ld50.postmean <- mean(ld50)
+
+par(mfrow=c(1,2))
+#logit plot
+emp.logits <- logit(emp.probs)
+
+x <- seq(0, 3, by = 0.01)
+plot(x, alpha[1] + beta[1]*x, type= "l", col="lightgrey", xlab= "dose", ylab="logit(Pr(Death)", main="Fitted Logits", ylim=c(-50, 50))
+for(i in 2:4000){
+  lines(x, alpha[i] + beta[i]*x, col="lightgrey")
+}
+abline(v = ld50.postmean, col="red", lwd=3)
+points(unique(frog.data$dose), emp.logits, pch=15, cex=1.5)
+
+#probability plot
+
+dose1 <- with(frog.data, sum(death[dose==0.42])/5)
+dose2 <- with(frog.data, sum(death[dose==0.71])/5)
+dose3 <- with(frog.data, sum(death[dose==0.98])/5)
+dose4 <- with(frog.data, sum(death[dose==2.13])/5)
+
+emp.probs <-  c(dose1, dose2, dose3, dose4)
+#fitted.probs <- fitted(glm.fit)
+
+plot(frog.data$dose, fitted.probs, type="n", ylab="Pr(Death)", xlab="Dose",
+main="Fitted Probabilities")
+curve(invlogit(alpha[1] + beta[1]*x), lwd=1, col="lightgrey", add=TRUE)
+for(i in 2:4000){
+  curve(invlogit(alpha[i] + beta[i]*x), col="lightgrey", add=TRUE)
+}
+abline(v = ld50.postmean, col="red", lwd=3)
+points(unique(frog.data$dose), emp.probs, pch=15, cex=1.5)
+@
+
+\item I'll use the Cauchy prior for $\alpha$ again with a smaller scale parameter. I'll use the Cauchy(0, 2) prior for $\alpha$, which makes the more likely values for $\alpha$ (the probability of death at the average dose) to be between about $0.01$ and $0.99$. This is still not very informative, but it is more informative than the Cauchy(0, 10). For $\beta$, I'll use a folded Cauchy prior. The problem does state that this drug is known to be lethal to frogs, so we should incorporate into our prior the knowledge that $\beta$ is greater than $0$. I'll use a folded Cauchy(0, 2.5). I'm still reflecting little knowledge in the magnitude of $\beta$, but this prior is more informative in the sense that it does not allow for negative values of $\beta$. The results are shown below for this model. 
+
+<<cauchyagain, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(1,2))
+plot(x, dcauchy(x, 0, 2), type="l", xlab="", main=expression(paste("Cauchy(0, 2) for ", alpha)), lwd=2, lty=2, xlim= c(-10, 10))
+
+plot(x, dcauchy(x, 0, 2.5), type="l", xlab="", main=expression(paste("Folded Cauchy (0, 2.5) for ", beta)), lwd=2, lty=2, xlim= c(0, 30))
+@
+
+<<cauchy2stanfit, echo=FALSE, message=FALSE, cache=TRUE, results='hide'>>=
+require(rstan)
+set.seed(232364)
+data <- with(frog.data, list(y = death, x = dose, N = length(death)))
+
+model2.inform <- stan_model(file = "~/Documents/Stat532/exams/exam2/model2inform.stan", 
+                     model_name = "model2.inform")
+samp2.inform <- sampling(model2.inform, chains = 4, iter = 2000, data = data)
 @
 
 
+<<compare5, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
+par(mfrow=c(1,2))
+require(rstan)
+alpha.inform <- extract(samp2.inform)$alpha
+
+hist(alpha.inform, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha))
+abline(v=coefs[1], col="red", lwd=3)
+
+beta.inform <- extract(samp2.inform)$beta
+hist(beta.inform, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
+abline(v=coefs[2], col="red", lwd=3)
+@
+
+
+\item In the histograms below, I compare the results for the models from (g) and (i). You can see the posterior draws of $\alpha$ and $\beta$ are drawn closer to $0$ in the model from part (i). \\
+
+I think the analysis in part (i) is most appropriate. The results from the improprer priors in part (c) do not make sense, not to mention I get a warning message when I run the model. The results from the Cauchy priors in part (g) are reasonable, but I think the prior I chose in part (i) is more appropriate because I chose priors that incorporated reasonable constraints in the context of the problem but were still vague enough to reflect little prior knowledge. The Cauchy priors in part (g) were more diffuse than they needed to be to reflect little prior knowlege in this context. I guess this is just another situation where it's smarter to think carefully about your priors instead of just choosing default non-informative priors.
+
+<<compareall, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
+par(mfrow=c(1,2))
+require(rstan)
+
+#alpha plot
+
+hist(alpha, freq = F, xlab=expression(alpha), nclass=40, main=expression(alpha), col="grey", ylim = c(0, 0.11))
+abline(v=coefs[1], col="red", lwd=3)
+
+hist(alpha.inform, freq = F, nclass=30, main=expression(alpha), add=TRUE, col = "lightgreen")
+
+hist(alpha.bad, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha), add=TRUE)
+legend(-75, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("lightgrey", "lightgreen"), cex = 0.8)
+
+#beta plot
+
+hist(beta, freq=F, xlab=expression(beta), nclass=40, main= expression(beta), 
+     col="grey", ylim = c(0, 0.09))
+abline(v=coefs[2], col="red", lwd=3)
+
+hist(beta.inform, freq=F, nclass=30, main= expression(beta), add=TRUE, col = "lightgreen")
+
+hist(beta.bad, freq=F, nclass=30, add=TRUE)
+legend(20, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("lightgrey", "lightgreen"), cex = 0.8)
+@
+
+
+\item I do not expect the assumption of independence to be met because I would expect the frogs in the same tank to have more similar death rates than frogs in different tanks. There could be other sources of dependence in the design that we are not told about such as age or health of the frogs. For this problem, I'll focus on investigating whether the death rates are more similar for frogs in the same tank. \\
+
+To implement the posterior predictive check, I will generate a large number of posterior predictive samples. For each posterior predictive sample, I'll assume that the first three frogs within a dose came from tank $1$, and the last two frogs within that dose came from tank $2$. Then, for each posterior predictive sample, I'll calculate the number of deaths within each tank for each dose. I'll display the histograms showing the distribution of deaths within each tank at each dose for all posterior predictive samples. I'll then compare to what was observed in the original dataset. My posterior predictive displays will look something like the following. I simulated these posterior predictions for the purpose of example, and I also show the code here.
+
+<<simpred, echo=FALSE>>=
+nsim <- 1000
+sim.dat <- matrix(NA, nrow = length(frog.data$death), ncol = nsim)
+for(i in 1:nsim){
+  sim.dat[,i] <- c(rbinom(5, 1, 0.1), rbinom(5, 1, 0.3), rbinom(5, 1, 0.4), 
+                   rbinom(5, 1, 0.6))
+}
+
+sim11.sum <- apply(sim.dat[1:3,], 2, sum)
+sim12.sum <- apply(sim.dat[4:5,], 2, sum)
+sim21.sum <- apply(sim.dat[6:8,], 2, sum)
+sim22.sum <- apply(sim.dat[9:10,], 2, sum)
+sim31.sum <- apply(sim.dat[11:13,], 2, sum)
+sim32.sum <- apply(sim.dat[14:15,], 2, sum)
+sim41.sum <- apply(sim.dat[16:18,], 2, sum)
+sim42.sum <- apply(sim.dat[19:20,], 2, sum)
+y.obs <- c(0, 0, 1, 0, 3, 2, 3, 2)
+@
+
+<<exdisplay, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
+par(mfrow=c(2,4))
+barplot(table(sim11.sum), main="Dose 0.4, Tank 1")
+abline(v = 0.75, col = "red", lwd = 3)
+barplot(table(sim12.sum), main="Dose 0.4, Tank 2")
+abline(v = 0.75, col = "red", lwd = 3)
+barplot(table(sim21.sum), main="Dose 0.75, Tank 1")
+abline(v = 2, col = "red", lwd = 3)
+barplot(table(sim22.sum), main="Dose 0.75, Tank 2")
+abline(v = 0.75, col = "red", lwd = 3)
+barplot(table(sim31.sum), main="Dose 1.0, Tank 1")
+abline(v = 4.3, col = "red", lwd = 3)
+barplot(table(sim32.sum), main="Dose 1.0, Tank 2")
+abline(v = 3, col = "red", lwd = 3)
+barplot(table(sim41.sum), main="Dose 2.0, Tank 1")
+abline(v = 3, col = "red", lwd = 3)
+barplot(table(sim42.sum), main="Dose 2.0, Tank 2")
+abline(v = 3, col = "red", lwd = 3)
+@
+
+Since the model generates posterior predictions under the assumption of independent observations, the posterior predictions represent what we would expect to see if frog deaths occurred independently within tanks. If the observed data showed more tanks with all frogs dying or no frogs dying than predicted by the model, I would suspect dependence among frogs within a tank. For example, suppose the number of deaths were most often $1$ death per tank in the posterior predictive samples. Then, if we observed either all or none of the frogs dying within a tank in the original sample, I would suspect that one frog dying in the tank is affecting the probability of death for another frog in that tank. An example of this would be the barplot shown for Dose 1.0, Tank 1 in the above figure. Biologically, I think it seems reasonable that if one frog dies within a tank and is not cleaned out right away, it would decrease the overall health of the other frog(s) in the tank and increase their probability of death.
+
+\item A fully Bayesian hierarchical model would be as follows. This model incorporates an adjustment for each tank ($k=1,2$), and it accounts for uncertainty in the parameters for the population of tank adjustments.
+\begin{align*}
+y_{ijk} &\sim Bern(logit^{-1}(\alpha + \beta x_j + \gamma_k)) \\
+p(\alpha) &\propto 1 \\
+p(\beta) &\propto 1 \\
+\gamma_k &\sim N(0, \sigma^2) \\
+p(\sigma^2) &\propto 1
+\end{align*}
 
 \end{enumerate}
 
+\item \begin{enumerate}
+
+\item Take for example the $N(0, 10000)$ prior that people sometimes use as a default 'uninformative prior' in canned software packages when they are forced to choose a proper prior. The relative density does appear to be higher for values of the parameter near $0$ (see below). But, the difference in densities is very small because the prior is spread out over such a large range of values (note the peak density is around $0.00004$). As a result, the chance of drawing a value between $0$ and $10$ isn't that much different than the chance of drawing a value between $20000$ and $20010$. This prior is uninformative in the sense that a very wide range of prior values are probable, and the difference in densities over this very wide range of values is small because the prior is so diffuse.  
+
+<<stdprior, echo=FALSE, out.width=".5\\linewidth">>=
+curve(dnorm(x,0,10000), from=-40000, to=40000, col=2, lwd=2, xlab=expression(mu))
+
+#curve(dgamma(x,0.01,0.01), from=0, to=10, col=2, lwd=2, xlab=expression(tau))
+@
+
+\item The posterior is sometimes sensitive to priors that are commonly regarded as non-informative. Take for example the $InvGam(0.01, 0.01)$ prior that is commonly used as a non-informative prior for variance parameters. Recent work has shown that applying this prior to a group level variance parameter in a hiearchical model can lead to very different posterior distributions than if a different vague, diffuse prior is used (Gelman 2006). This goes to show that a sensitivity analysis of the posterior to the priors should be performed even if the priors used are commonly known as non-informative.
+
 \end{enumerate}
+
+\item The proposal distribution is a computational tool used to obtain draws from the posterior distribution. We need to get the spread and center of the proposal distribution just right to maximize efficiency of the Metropolis Hastings algorithm. So, we often look at the likelihood to get a ballpark idea of what the spread of the proposal distribution should be. The key difference between the proposal distribution and the prior distribution is that the proposal distribution does not contribute to the model at all, it is simply used in computation. If we try to use the likelihood to inform the prior distribution, we'd be using an empirical Bayes approach. If you allow the data to inform the prior, you're not doing a true Bayesian analysis.
+
+\item The data won't always be representative of the population, and with few data it is hard to quantify the amount of variability in the population. As a result, classical inference is often wrong if few data available and are not representative of the population. The ability to incorporate prior knowledge in a Bayesian analysis can help us see when the data collected are not representative of the truth, and it can help us fit a better, more informed model. I think of the prior as a piece of known information going into the fitted model. As I saw in problems $1$ and $2$, the prior can really help to inform results and lead to reasonable posteriors even when the few data available don't seem to provide much information at all.
+
+\end{enumerate}
+
+{\Large \bf References} \\
+
+\noindent Gelman, Andrew. "Prior Distributions for Variance Parameters in Hierarchical Models(Comment on Article by Browne and Draper)." International Society for Bayesian Analysis 1.3 (2006): 515-34. Print.
+
+{\Large \bf R Code Appendix}
+
+<<drawfrommultiprior, eval=FALSE>>=
+@
+
 
 \end{document}

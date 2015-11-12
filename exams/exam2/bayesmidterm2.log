@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.8.27)  10 NOV 2015 22:59
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.8.27)  11 NOV 2015 17:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -316,130 +316,213 @@ File: figure/likelihood2-1.pdf Graphic file (type pdf)
 <use figure/likelihood2-1.pdf>
 Package pdftex.def Info: figure/likelihood2-1.pdf used on input line 107.
 (pdftex.def)             Requested size: 450.66562pt x 225.33151pt.
-Package color Info: Redefining color shadecolor on input line 116.
-
-<figure/jointpost-1.pdf, id=3, 433.62pt x 289.08pt> [1
+ [1
 
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map} <./figure/likelihood-1.pdf>
  <./figure/likelihood2-1.pdf>]
-File: figure/jointpost-1.pdf Graphic file (type pdf)
- <use figure/jointpost-1.pdf>
-Package pdftex.def Info: figure/jointpost-1.pdf used on input line 117.
-(pdftex.def)             Requested size: 428.6934pt x 285.81073pt.
-Package color Info: Redefining color shadecolor on input line 136.
-LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 139.
-LaTeX Font Info:    Try loading font information for OMS+cmtt on input line 139
-.
+Package color Info: Redefining color shadecolor on input line 118.
 
-(/usr/share/R/share/texmf/tex/latex/omscmtt.fd
+<figure/jointpost-1.pdf, id=22, 433.62pt x 289.08pt>
+File: figure/jointpost-1.pdf Graphic file (type pdf)
+
+<use figure/jointpost-1.pdf>
+Package pdftex.def Info: figure/jointpost-1.pdf used on input line 119.
+(pdftex.def)             Requested size: 428.6934pt x 285.81073pt.
+Package color Info: Redefining color shadecolor on input line 138.
+LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <10> not available
+(Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 141.
+LaTeX Font Info:    Try loading font information for OMS+cmtt on input line 141
+.
+ (/usr/share/R/share/texmf/tex/latex/omscmtt.fd
 File: omscmtt.fd 
 )
 LaTeX Font Info:    Font shape `OMS/cmtt/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 139.
- [2 <./figure/jointpost-1.pdf>]
-Underfull \vbox (badness 10000) detected at line 223
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 141.
+
+[2 <./figure/jointpost-1.pdf>]
+Underfull \vbox (badness 10000) detected at line 225
  []
 
 
-Underfull \vbox (badness 10000) detected at line 223
+Underfull \vbox (badness 10000) detected at line 225
  []
 
 [3]
-Package color Info: Redefining color shadecolor on input line 233.
+Package color Info: Redefining color shadecolor on input line 235.
  <figure/converdiags-1.pdf, id=39, 578.16pt x 289.08pt>
 File: figure/converdiags-1.pdf Graphic file (type pdf)
 
 <use figure/converdiags-1.pdf>
-Package pdftex.def Info: figure/converdiags-1.pdf used on input line 234.
+Package pdftex.def Info: figure/converdiags-1.pdf used on input line 236.
 (pdftex.def)             Requested size: 450.66562pt x 225.33151pt.
  [4 <./figure/converdiags-1.pdf>]
-Package color Info: Redefining color shadecolor on input line 252.
-Package color Info: Redefining color shadecolor on input line 277.
+Package color Info: Redefining color shadecolor on input line 255.
+Package color Info: Redefining color shadecolor on input line 280.
 
-Overfull \hbox (168.82898pt too wide) in paragraph at lines 295--295
+Overfull \hbox (168.82898pt too wide) in paragraph at lines 298--298
 [][]\OT1/cmtt/m/n/10 warmup.model1[] []<-[] []jags.model[][]([][]"model1.jags"[
 ][],[] []data[][]=dental.data,[] []n.chains[][]=n.chain,[] []inits[][]= inits,[
 ] []n.adapt[][]=[][]4000[][],[] []quiet[][]=[][]TRUE[][])[][] 
  []
 
 [5]
-Package color Info: Redefining color shadecolor on input line 310.
+Package color Info: Redefining color shadecolor on input line 313.
  <figure/jagsdrawscompare-1.pdf, id=56, 722.7pt x 289.08pt>
 File: figure/jagsdrawscompare-1.pdf Graphic file (type pdf)
 
 <use figure/jagsdrawscompare-1.pdf>
-Package pdftex.def Info: figure/jagsdrawscompare-1.pdf used on input line 311.
+Package pdftex.def Info: figure/jagsdrawscompare-1.pdf used on input line 314.
 (pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
-Package color Info: Redefining color shadecolor on input line 318.
+Package color Info: Redefining color shadecolor on input line 321.
 
 <figure/jagshyperdraws-1.pdf, id=57, 722.7pt x 289.08pt>
 File: figure/jagshyperdraws-1.pdf Graphic file (type pdf)
 
 <use figure/jagshyperdraws-1.pdf>
-Package pdftex.def Info: figure/jagshyperdraws-1.pdf used on input line 319.
+Package pdftex.def Info: figure/jagshyperdraws-1.pdf used on input line 322.
 (pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
  [6 <./figure/jagsdrawscompare-1.pdf> <./figure/jagshyperdraws-1.pdf>]
-Package color Info: Redefining color shadecolor on input line 339.
+Package color Info: Redefining color shadecolor on input line 333.
 
+<figure/drawfrommultiprior-1.pdf, id=74, 361.35pt x 289.08pt>
+File: figure/drawfrommultiprior-1.pdf Graphic file (type pdf)
 
-! LaTeX Error: Something's wrong--perhaps a missing \item.
+<use figure/drawfrommultiprior-1.pdf>
+Package pdftex.def Info: figure/drawfrommultiprior-1.pdf used on input line 334
+.
+(pdftex.def)             Requested size: 214.3467pt x 171.47762pt.
+Package color Info: Redefining color shadecolor on input line 354.
 
-See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.342 ...numerically 0 or 1 occurred}}\end{kframe}
-                                                  
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-<figure/glmmodel-1.pdf, id=74, 361.35pt x 289.08pt>
+<figure/glmmodel-1.pdf, id=75, 361.35pt x 289.08pt>
 File: figure/glmmodel-1.pdf Graphic file (type pdf)
 
 <use figure/glmmodel-1.pdf>
-Package pdftex.def Info: figure/glmmodel-1.pdf used on input line 343.
+Package pdftex.def Info: figure/glmmodel-1.pdf used on input line 358.
 (pdftex.def)             Requested size: 225.33281pt x 180.26874pt.
-Package color Info: Redefining color shadecolor on input line 357.
-Package color Info: Redefining color shadecolor on input line 377.
-Package color Info: Redefining color shadecolor on input line 393.
- <figure/compare-1.pdf, id=75, 722.7pt x 289.08pt>
-[7 <./figure/glmmodel-1.pdf>]
+ [7 <./figure/drawfrommultiprior-1.pdf> <./figure/glmmodel-1.pdf>]
+Package color Info: Redefining color shadecolor on input line 371.
+Package color Info: Redefining color shadecolor on input line 391.
+Package color Info: Redefining color shadecolor on input line 407.
+ <figure/compare-1.pdf, id=93, 722.7pt x 289.08pt>
 File: figure/compare-1.pdf Graphic file (type pdf)
- <use figure/compare-1.pdf>
-Package pdftex.def Info: figure/compare-1.pdf used on input line 394.
-(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
-Package color Info: Redefining color shadecolor on input line 405.
 
-<figure/stdcompare-1.pdf, id=87, 722.7pt x 289.08pt>
+<use figure/compare-1.pdf>
+Package pdftex.def Info: figure/compare-1.pdf used on input line 408.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+Package color Info: Redefining color shadecolor on input line 419.
+
+<figure/stdcompare-1.pdf, id=94, 722.7pt x 289.08pt> [8 <./figure/compare-1.pdf
+>]
 File: figure/stdcompare-1.pdf Graphic file (type pdf)
-
-<use figure/stdcompare-1.pdf>
-Package pdftex.def Info: figure/stdcompare-1.pdf used on input line 406.
+ <use figure/stdcompare-1.pdf>
+Package pdftex.def Info: figure/stdcompare-1.pdf used on input line 420.
 (pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
- [8 <./figure/compare-1.pdf> <./figure/stdcompare-1.pdf>] (./bayesmidterm2.aux)
- ) 
+
+Underfull \hbox (badness 10000) in paragraph at lines 424--425
+
+ []
+
+Package color Info: Redefining color shadecolor on input line 429.
+<figure/dcauchy-1.pdf, id=105, 361.35pt x 289.08pt>
+File: figure/dcauchy-1.pdf Graphic file (type pdf)
+ <use figure/dcauchy-1.pdf>
+Package pdftex.def Info: figure/dcauchy-1.pdf used on input line 430.
+(pdftex.def)             Requested size: 225.33281pt x 180.26874pt.
+
+[9 <./figure/stdcompare-1.pdf> <./figure/dcauchy-1.pdf>]
+Package color Info: Redefining color shadecolor on input line 441.
+
+<figure/compare4-1.pdf, id=121, 722.7pt x 289.08pt>
+File: figure/compare4-1.pdf Graphic file (type pdf)
+
+<use figure/compare4-1.pdf>
+Package pdftex.def Info: figure/compare4-1.pdf used on input line 442.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+Package color Info: Redefining color shadecolor on input line 447.
+
+<figure/plotreglines-1.pdf, id=122, 722.7pt x 289.08pt>
+File: figure/plotreglines-1.pdf Graphic file (type pdf)
+
+<use figure/plotreglines-1.pdf>
+Package pdftex.def Info: figure/plotreglines-1.pdf used on input line 448.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+Package color Info: Redefining color shadecolor on input line 455.
+
+<figure/cauchyagain-1.pdf, id=123, 722.7pt x 289.08pt>
+File: figure/cauchyagain-1.pdf Graphic file (type pdf)
+
+<use figure/cauchyagain-1.pdf>
+Package pdftex.def Info: figure/cauchyagain-1.pdf used on input line 456.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+Package color Info: Redefining color shadecolor on input line 464.
+
+<figure/compare5-1.pdf, id=124, 722.7pt x 289.08pt> [10 <./figure/compare4-1.pd
+f> <./figure/plotreglines-1.pdf>]
+File: figure/compare5-1.pdf Graphic file (type pdf)
+ <use figure/compare5-1.pdf>
+Package pdftex.def Info: figure/compare5-1.pdf used on input line 465.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+
+Underfull \hbox (badness 10000) in paragraph at lines 470--471
+
+ []
+
+Package color Info: Redefining color shadecolor on input line 475.
+<figure/compareall-1.pdf, id=140, 722.7pt x 289.08pt>
+File: figure/compareall-1.pdf Graphic file (type pdf)
+
+<use figure/compareall-1.pdf>
+Package pdftex.def Info: figure/compareall-1.pdf used on input line 476.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+ [11 <./figure/cauchyagain-1.pdf> <./figure/compare5-1.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 481--482
+
+ []
+
+Package color Info: Redefining color shadecolor on input line 488.
+<figure/exdisplay-1.pdf, id=157, 722.7pt x 289.08pt>
+File: figure/exdisplay-1.pdf Graphic file (type pdf)
+
+<use figure/exdisplay-1.pdf>
+Package pdftex.def Info: figure/exdisplay-1.pdf used on input line 489.
+(pdftex.def)             Requested size: 450.66562pt x 180.26874pt.
+ [12 <./figure/compareall-1.pdf> <./figure/exdisplay-1.pdf>]
+Package color Info: Redefining color shadecolor on input line 511.
+ <figure/stdprior-1.pdf, id=173, 361.35pt x 289.08pt>
+File: figure/stdprior-1.pdf Graphic file (type pdf)
+
+<use figure/stdprior-1.pdf>
+Package pdftex.def Info: figure/stdprior-1.pdf used on input line 512.
+(pdftex.def)             Requested size: 225.33281pt x 180.26874pt.
+ [13 <./figure/stdprior-1.pdf>]
+Underfull \hbox (badness 10000) in paragraph at lines 526--527
+
+ []
+
+Package color Info: Redefining color shadecolor on input line 533.
+[14] [15] (./bayesmidterm2.aux) ) 
 Here is how much of TeX's memory you used:
- 2777 strings out of 494985
- 37556 string characters out of 6180356
- 113050 words of memory out of 5000000
- 5928 multiletter control sequences out of 15000+600000
- 8919 words of font info for 35 fonts, out of 8000000 for 9000
+ 2826 strings out of 494985
+ 38750 string characters out of 6180356
+ 113062 words of memory out of 5000000
+ 5966 multiletter control sequences out of 15000+600000
+ 9525 words of font info for 37 fonts, out of 8000000 for 9000
  36 hyphenation exceptions out of 8191
- 38i,8n,26p,704b,533s stack positions out of 5000i,500n,10000p,200000b,80000s
-</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></us
-r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmitt10.pfb></usr/sha
-re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/tex
-live/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dis
-t/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/
-type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/
-public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmtt10.pfb>
-Output written on bayesmidterm2.pdf (8 pages, 194227 bytes).
+ 38i,8n,26p,1034b,533s stack positions out of 5000i,500n,10000p,200000b,80000s
+</usr/share/texlive/texmf-dist/fonts/type1/pub
+lic/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/am
+sfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts
+/cm/cmitt10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mmi12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.p
+fb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></us
+r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/
+texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texliv
+e/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf
+-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
+Output written on bayesmidterm2.pdf (15 pages, 6976123 bytes).
 PDF statistics:
- 133 PDF objects out of 1000 (max. 8388607)
- 95 compressed objects within 1 object stream
+ 224 PDF objects out of 1000 (max. 8388607)
+ 159 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
- 46 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 91 words of extra memory for PDF output out of 10000 (max. 10000000)
 

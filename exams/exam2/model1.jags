@@ -8,7 +8,7 @@ y[i] ~ dbin(pi, m)
 
 pi ~ dbeta(eta/sigma^2, (1-eta)/sigma^2)
 eta ~ dunif(0, 1)
-sigma ~ dunif(0, 100)
+sigma ~ dunif(0, 1)
 
 m ~ dpois(lambda)
 lambda ~ dunif(0, 500)

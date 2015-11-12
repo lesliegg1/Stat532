@@ -46,9 +46,9 @@ Leslie Gains-Germain
 
 \item The following example was inspired by Claire and Jordan's consulting project. Suppose there are five reservations in Montana. The number of children eligible to receive dental sealants on the reservation is unknown because it's hard to keep track of this population. A success is observed when a child comes to a dental clinic to have dental sealants applied. The number of children on each of the five reservations who had dental sealants applied in $2014$ was observed. The probability of having the sealants applied and the number of eligible children is assumed to be the same for all five reservations. 
 
-\item The MLE occurs near $m=101, \pi=0.21$. 
+\item The MLE occurs near $m=101, \pi=0.21$. I found this value by finding the maximum value on a grid. 
 
-<<likelihood, echo=FALSE, out.width="\\linewidth", fig.width=8>>=
+<<likelihood, echo=FALSE, out.width=".9\\linewidth", fig.width=8>>=
 loglik.fun <- function(m.pi, y.vec){
   sum(lchoose(m.pi[1], y.vec)+y.vec*log(m.pi[2])+(m.pi[1]-y.vec)*log(1-m.pi[2]))
 }
@@ -74,9 +74,9 @@ contour(m, pi, lik.mat, levels=seq(0.05, 0.95, 0.25), xlim=c(20, 230),
 points(grid.max[1], grid.max[2], col="red", pch=16, cex=2)
 @
 
-\item The MLE occurs near $m=196, \pi=0.11$. 
+\item The MLE occurs near $m=196, \pi=0.11$. I found this value by finding the maximum value on the grid.  
 
-<<likelihood2, echo=FALSE, out.width="\\linewidth", fig.width=8>>=
+<<likelihood2, echo=FALSE, out.width=".9\\linewidth", fig.width=8>>=
 loglik.fun <- function(m.pi, y.vec){
   sum(lchoose(m.pi[1], y.vec)+y.vec*log(m.pi[2])+(m.pi[1]-y.vec)*log(1-m.pi[2]))
 }
@@ -102,13 +102,13 @@ contour(m, pi, lik.mat, levels=seq(0.05, 0.95, 0.25), xlim=c(20, 230),
 points(grid.max[1], grid.max[2], col="red", pch=16, cex=2)
 @
 
-\item
+\item The shape of the likelihood function doesn't appear to change much in the contour plots, but my grid approximation for th MLE for $m$ changes from $101$ to $196$ when just one data point changes! Additionally, my grid approximation for the MLE for $\pi$ changes from $0.21$ to $0.11$.  I think this happens because the top of the likelihood function is fairly flat, so one small change in the data has a large effect on the location of the maximum. Because the top of the likelihood is so flat, I don't think it would be possible to use \verb+optim+ to solve for the MLE. I think the lesson here is that with so few data and $m$ and $\pi$ unknown, the MLE is very unstable and we shouldn't put too much trust in it.
 
 \item \begin{enumerate}
 
-\item The joint posterior distribution of $(m, \pi)$ is shown below.
+\item The joint posterior distribution of $(m, \pi)$ is shown below, overlaid on the likelihood function from above. The posterior distribution is centered near the prior mean of $100$, and is actually far from the approximate MLE I found above. Additionally, the posterior contours are more circular and less spread out than the likelihood contour lines. Adding prior information seems to have improved the stability of the estimates for $m$ and $\pi$. 
 
-<<jointpost, echo=FALSE, out.width="\\linewidth", fig.width=6, warning=FALSE>>=
+<<jointpost, echo=FALSE, out.width=".9\\linewidth", fig.width=8, warning=FALSE>>=
 log.prior.fun <- function(m.pi) {
   -lfactorial(m.pi[1])+m.pi[1]*log(100)-100
 }
@@ -139,15 +139,32 @@ p(\pi|y, m) &= \frac{p(\pi, y, m)}{p(y, m)} \\
 &\propto p(\pi, y, m) \\
 &\propto p(y|\pi, m)p(m, \pi) \\
 &\propto p(y|\pi, m)p(\pi) \\
+&\propto \prod_{i=1}^{5} {m \choose y_i} \pi^{\sum  y_i} (1-\pi)^{\sum m-y_i} \\
 p(m|y, \pi) &= \frac{p(\pi, y, m)}{p(y, \pi)} \\
 &\propto p(\pi, y, m) \\
 &\propto p(y|\pi, m)p(m, \pi) \\
-&\propto p(y|\pi, m)p(m)
+&\propto p(y|\pi, m)p(m) \\
+&\propto \prod_{i=1}^{5} {m \choose y_i} \pi^{\sum  y_i} (1-\pi)^{\sum m-y_i} \frac{e^{-100} 100^m}{m!}
 \end{align*}
 
-\item My code for the Gibbs sampler is shown below.
+\item My code for the Gibbs sampler is shown below. I chose a Poisson proposal distribution for $m$ and a Beta proposal distribution for $\pi$.
 
 <<gibbs, echo=TRUE>>=
+#function used previously to get log likelihood
+loglik.fun <- function(m.pi, y.vec){
+  sum(lchoose(m.pi[1], y.vec)+y.vec*log(m.pi[2])+(m.pi[1]-y.vec)*log(1-m.pi[2]))
+}
+
+#function used previously to get log prior
+log.prior.fun <- function(m.pi) {
+  -lfactorial(m.pi[1])+m.pi[1]*log(100)-100
+}
+
+#function used previously to get log posterior
+log.post.fun <- function(m.pi, y.vec) {
+  loglik.fun(m.pi, y.vec) + log.prior.fun(m.pi)
+}
+
 #function to calculate complete conditional for pi on log scale
 log.pi.cc.fun <- function(m.pi, y.vec){
   loglik.fun(m.pi, y.vec)
@@ -264,7 +281,9 @@ gelman.diag(pi.mcmc)
 
 \end{enumerate}
 
-\item The marginal posterior distributions for $m$ and $\pi$ are shown below. The posterior probability that $m>100$ is $0.443$ and the posterior probability that $\pi < 0.3$ is $0.989$. Since $m$ and $\pi$ are independent, the joint posterior probability that $m > 100$ and $\pi < 0.3$ is $0.443*0.989 = 0.438$.
+\item I checked convergence of my gibbs sampler and everything looks good. The marginal posterior distributions for $m$ and $\pi$ are shown below. The posterior mean for $m$ is $99.2$ and the posterior mean for $\pi$ is $0.22$. Recall that the approximate MLE I found on the grid was $m=196$, $\pi = 0.11$, and the prior means were $m = 100$ and $\pi = 0.5$. I display these means on the plot below. You can clearly see that the prior mean of $m$ has a huge influence on the posterior mean for $m$ (likely due to the instability in the likelihood based estimate for $m$). The prior mean for $\pi$ also has an impact on the posterior mean for $\pi$ (although a lesser impact than for $m$). \\
+
+The posterior probability that $m>100$ is $0.443$ and the posterior probability that $\pi < 0.3$ is $0.989$. Since $m$ and $\pi$ are independent, the joint posterior probability that $m > 100$ and $\pi < 0.3$ is $0.443*0.989 = 0.438$.
 
 <<converdiags, echo=FALSE, out.width="\\linewidth", fig.width=8>>=
 par(mfrow=c(1,2))
@@ -280,17 +299,45 @@ hist(pi.draws, freq=FALSE, nclass=50, xlab=expression(pi))
 #mean(pi.draws<0.3)
 @
 
-\item disads
+<<contcompare, echo=FALSE, out.width="\\linewidth", fig.width=8>>=
+m <- seq(28, 250, by=1)
+pi <- seq(0.05, 0.9, length=length(m))
+grid.vals <- expand.grid(m=m, pi=pi)
+grid.vals <- as.matrix(grid.vals)
+loglik.vals <- apply(grid.vals, 1, loglik.fun, y.vec=y2.data)
+
+lik.vals <- exp(loglik.vals-max(loglik.vals))
+lik.mat <- matrix(lik.vals, nrow=length(m), ncol=length(pi))
+
+#find where max occurs on grid
+grid.max <- grid.vals[which(loglik.vals==max(loglik.vals)),]
+
+contour(m, pi, lik.mat, levels=seq(0.05, 0.95, 0.25), xlim=c(20, 230), 
+        ylim=c(0, 0.8), 
+        xlab=expression(m), ylab=expression(pi), 
+        main=expression(paste(y[2], " data")))
+points(grid.max[1], grid.max[2], col="darkblue", pch=2, cex=2, lwd=3)
+points(mean(m.draws), mean(pi.draws), col="red", pch=16, cex=2)
+points(100, 0.5, col="black", pch=3, cex=2, lwd=3)
+legend(130, 0.7, bty="n", c("Prior", "Posterior", "Likelihood"), col=c("black", "red", "darkblue"), pch=c(2, 16, 3), cex=0.8)
+@
+
+
+\item The main disadvantage is that this model does not account for the fact that the values of the hyperparameters for $\pi$ and $m$ are unknown. $\lambda = 100$ was an estimated value, and the parameters of the Beta distribution were estimated as well. By treating these values as known, we are missing some uncertainty that should be incorporated in the model. I think another disadvantage of using the Poisson distribution as a prior is that the variance is a function of the mean, so that the variance of the prior can't be specified separately from the mean.
 
 \item The hierarchical version of the model puts priors on $\lambda$ and priors on parameters of a $Beta(\alpha, \beta)$ distribution. I chose to put priors on the prior mean, $\eta = \frac{\alpha}{\alpha+\beta}$ and the somewhat approximate prior standard deviation, $\sigma = \sqrt{\frac{1}{\alpha + \beta}}$, kind of like what we did in the Beta-Binomial example with the stomach cancer data.
 \begin{align*}
 y_i &\sim Bin(m, \pi) \\
 \pi &\sim Beta(\frac{\eta}{\sigma^2}, \frac{1-\eta}{\sigma^2}) \\
-\sigma &\sim Uniform(0, 100) \\
+\sigma &\sim Uniform(0, 1) \\
 \eta &\sim Uniform(0, 1) \\
-m &\sim Poisson(\lambda)
+m &\sim Poisson(\lambda) \\
 \lambda &\sim Uniform(0, 500)
 \end{align*}
+
+I chose a $Uniform(0, 500)$ prior for $\lambda$ as a weakly informative prior. The Montana reservations aren't that large, and the number of eligible kids on each reservation can't be more than $500$. \\
+
+I chose a $Uniform(0, 1)$ prior for the prior mean, $\eta$, to reflect little prior knowledge except that it must be between $0$ and $1$. I also put a $Uniform(0, 1)$ prior on the prior standard deviation, $\sigma$, to reflect little knowledge. At first, I experimented with putting a more diffuse prior on $\sigma$, but I had problems with convergence and the results weren't making sense. With values of $\pi$ between $0$ and $1$, I don't think it would make sense for the prior standard deviation to be larger than $1$. 
 
 \item The JAGs code I used to obtain draws from the above model is shown below.
 
@@ -306,7 +353,7 @@ y[i] ~ dbin(pi, m)
 
 pi ~ dbeta(eta/sigma^2, (1-eta)/sigma^2)
 eta ~ dunif(0, 1)
-sigma ~ dunif(0, 100)
+sigma ~ dunif(0, 1)
 
 m ~ dpois(lambda)
 lambda ~ dunif(0, 500)
@@ -324,15 +371,16 @@ set.seed(52)
 dental.data <- list(N=length(y2.data), y=y2.data)
 
 inits <- list(list(pi=0.4, eta = .00003, m = 100, lambda = 500, 
-                   sigma = 1.20), 
-              list(pi=0.2, eta = .00003, m = 50, lambda = 150, 
-                   sigma = 2.24),
-              list(pi=0.4, eta = .00003, m = 150, lambda = 300, 
-                   sigma = 1.58))
+                   sigma = 0.5), 
+              list(pi=0.2, eta = .02, m = 50, lambda = 150, 
+                   sigma = 0.9),
+              list(pi=0.4, eta = .5, m = 150, lambda = 300, 
+                   sigma = 0.1))
 n.chain <- 3
 
 #warmup
-warmup.model1 <- jags.model("model1.jags", data=dental.data, n.chains=n.chain, inits= inits, n.adapt=4000, quiet=TRUE)
+warmup.model1 <- jags.model("model1.jags", data=dental.data, n.chains=n.chain, 
+                            inits= inits, n.adapt=4000, quiet=TRUE)
 
 #parameters to save
 params <- c("pi", "eta", "sigma", "m", "lambda")
@@ -342,7 +390,9 @@ n.iter=50000
 model1 <- coda.samples(warmup.model1, params, n.iter=n.iter)
 @
 
-\item The plots below compare the posterior distributions for $\pi$ and $m$ obtained in part (f) to those from the hierarchical model. There is much more variability in the posterior draws for $m$ and $\pi$ in the hierarchical model compared to the model with fixed hyperparameters. I think this makes sense because when the hyperparameter values are approximated, the model does not incorporate uncertainty in these parameters. With such a small sample size, the additional source of uncertainty accounted for in the hierarchical model makes a big difference in the results.
+\item The plots below compare the posterior distributions for $\pi$ and $m$ obtained in part (f) to those from the hierarchical model. There is much more variability in the posterior draws for $m$ and $\pi$ in the hierarchical model compared to the model with fixed hyperparameters. I think this makes sense because when the hyperparameter values are approximated, the model does not incorporate uncertainty in these parameters. With such a small sample size, the additional source of uncertainty accounted for in the hierarchical model makes a big difference in the results. \\
+
+By allowing prior values of $\lambda$ to vary between $0$ and $500$, we see a large range of posterior draws for $m$ between $0$ and $500$. We do see a higher proportion of draws between $50$ and $100$. This is counterintuitive to me because with more uncertainty in the prior parameters, I would have expected the posterior for $m$ to be closer to the approximate MLE of $196$ that I found in part (c). For $\pi$, we do see a larger proportion of draws between $0.05$ and $0.2$, which is more similar to the MLE I estimated in part (c). 
 
 <<jagsdrawscompare, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 #par(mfrow=c(2,3))
@@ -362,7 +412,7 @@ hist(pi.draws, freq=FALSE, nclass=50, add=TRUE)
 legend(0.25, 10, bty="n", c("Fixed hyperparams", "Hierarchical"), fill=c("white", "lightgreen"), cex=0.8)
 @
 
-The posterior distributions of the hyperparameters are shown below, with the fixed values used in (e).
+The posterior distributions of the hyperparameters are shown below, with the fixed values used in (e). The fixed values used in (e) are well within the range of posterior draws for the hyperparameters. Looking at these plots, it's really apparent how much additional uncertainty is incorporated into the model by putting hyperpriors on the hyperparameters instead of treating them as known. 
 
 <<jagshyperdraws, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 par(mfrow=c(1,3))
@@ -382,9 +432,10 @@ abline(v=0.5, lwd=3, col="red")
 
 \item \begin{enumerate}
 
-\item When I first looked at this prior, I thought he was trying to give higher density to values of $\mu$ and $\pi$ that yield smaller numbers of successes. But then, on second thought, I thought maybe he is trying to specify a non-informative prior by spreading density out over a large range of values for $\pi$ and $\mu$. 
+\item When I first looked at this prior, I thought he was trying to give higher density to values of $\lambda$ and $\pi$ that yield smaller expected numbers of successes. But then, on second thought, I thought maybe this prior is similar to the $\frac{1}{\sigma^2}$ prior which does give higher density to small values of $\sigma^2$, but is actually a non-informative prior because it spreads density throughout a large range of parameter values. I think a good way to visualize this would be to write rejection sampling code to sample from this prior, and see what combinations of $\pi$ and $\lambda$ are sampled most often. We could also look at the sensitivity of the posterior to the prior to get a sense of whether it is acting as a ``non-informative'' prior. \\
 
-\item When I look at the plot of the Raftery Prior, it looks like small values of $\lambda$ with any value of $\pi$ are most probable. When I generated draws from the priors I specified in (i), however, it looks like values of $\lambda$ between $0$ and $500$ are equally likely, with values of $\pi$ close to $0$ or $1$ being most probable. These priors don't seem very similar at all. I included the code for this part in the appendix. 
+\item When I look at the plot of the Raftery Prior, it looks like small values of $\lambda$ with any value of $\pi$ are most probable because the contour lines show up in the farthest left portion of the plot. When I generated draws from the priors I specified in (i), I get a smattering of values of $\lambda$ and $\pi$ over the entire parameter space. My prior appears to be more vague than the raftery prior, with probability spread more evenly throughout the parameter space.
+
 
 <<drawfrommultiprior, echo=FALSE, cache=TRUE, out.width="0.8\\linewidth", fig.width=8>>=
 set.seed(908)
@@ -395,7 +446,7 @@ for(i in 1:1000){
   lambda.draw[i] <- runif(1, 0, 500)
   m.draw <- rpois(1, lambda.draw)
 
-  sigma.draw <- runif(1, 0, 100)
+  sigma.draw <- runif(1, 0, 1)
   eta.draw <- runif(1, 0, 1)
   pi.draw[i] <- rbeta(1, eta.draw/sigma.draw^2, (1-eta.draw)/sigma.draw^2)
 }
@@ -413,13 +464,13 @@ prior.vals <- apply(mu.pi.vals, 1, prior.vals.fun)
 
 prior.mat <- matrix(prior.vals, nrow=length(mu.vals), ncol=length(pi.vals))
 
-contour(lambda.vals, pi.vals, prior.mat, levels=seq(0.05, 0.95, 0.25), 
+contour(lambda.vals, pi.vals, prior.mat, levels=seq(0.001, 0.95, 0.05), 
         xlab=expression(lambda), ylab=expression(pi), main="Raftery Prior vs. Prior (i)", 
-        lwd=3, col="red", xlim = c(0, 500))
-points(lambda.draw, pi.draw, col="black", pch=16)
+        lwd=4, col="red", xlim = c(0, 500))
+points(lambda.draw, pi.draw, col="lightgrey", pch=16)
 
-legend(20, 0.6, bty="n", legend=c("Raftery Prior", "Prior (i)"),
-       fill=c("red", "black"), cex=0.8)
+legend(200, 0.6, bty="n", legend=c("Raftery Prior", "Prior (i)"),
+       fill=c("red", "lightgrey"), cex=1)
 
 @
 
@@ -496,24 +547,38 @@ model2 <- stan_model(file = "~/Documents/Stat532/exams/exam2/model2.stan",
 samp2 <- sampling(model2, chains = 4, iter = 2000, data = data)
 @
 
-\item The posterior draws for the y-intercept ($\alpha$) and the dose effect ($\beta$) are shown below. The red line indicates the estimate from the above generalized linear model.
+\item The posterior draws for the y-intercept ($\alpha$) and the dose effect ($\beta$) are shown below. The red line indicates the estimate from the above generalized linear model. Note that the posterior draws seem really extreme. When I ran the model, I got a warning message that said, ``There were 8332 transitions after warmup that exceeded the maximum treedepth". I looked at the traceplots, and they indicated that the model  had not converged. I think convergence is taking a long time because the priors used are so diffuse, and I think the warning message is happening because the data have separation issues.
 
 <<compare, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
 par(mfrow=c(1,2))
 require(rstan)
 alpha.bad <- extract(samp2)$alpha
 
-hist(alpha.bad, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha))
+hist(alpha.bad, freq = F, xlab=expression(alpha), nclass=20, main=expression(alpha))
 abline(v=coefs[1], col="red", lwd=3)
 
 beta.bad <- extract(samp2)$beta
-hist(beta.bad, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
+hist(beta.bad, freq=F, xlab=expression(beta), nclass=20, main= expression(beta))
 abline(v=coefs[2], col="red", lwd=3)
+
+ld50 <- (0.5-alpha.bad)/beta.bad
+l <- quantile((0.5-alpha.bad)/beta.bad, 0.0275)
+u <- quantile((0.5-alpha.bad)/beta.bad, 0.975)
 @
 
-\item Discuss and explain
+\item Most of the posterior draws for $\alpha$ and $\beta$ were way more extreme than the estimates from the traditional logistic regression model. I think these extreme draws are occuring in the STAN model because the posterior distributions are sensitive to the prior when a small amount of data are available. With such diffuse priors on $\alpha$ and $\beta$, very extreme values are considered probable. In contrast, the binomial logistic regression model fits a line to the empirical logits, and no other information other than the data is supplied when estimating $\alpha$ and $\beta$. So, without the influence of a large diffuse prior, the observed values of $\alpha$ and $\beta$ are less extreme. \\
 
-\item The plots of the posterior draws for $\alpha$ and $\beta$ are shown below for the model with standardized dose as the predictor variable. The posterior draws for $\alpha$ have changed, but this is expected because $\alpha$ is now the log odds of death at the average dose. Standardizing dose does not appear to change inference about the effect of dose on the log odds of survival. Also, the efficiency of the sampler has not changed noticeably.
+I started to compare the mean LD50 in the stan model to the estimated LD50 found from glm(). Recall the estimated LD50 from glm() was $0.734$. From the STAN model, I found that the estimated LD50 from all the posterior draws was $0.711$ with a $95\%$ posterior interval from $0.710$ to $0.717$! I thought this was really weird, so I looked at a two dimensional plot of the ($\alpha, \beta$) draw pairs (see below). It seems like what happened in this model is that the extreme draws were drawn in pairs, and were all proportional to the estimates found from glm(). In any case, strange things are happening with such diffuse priors, and I think we should consider more informative priors, especially when there are so few data.
+
+<<mat, echo=FALSE, out.width=".5\\linewidth">>=
+plot(alpha.bad, beta.bad, type="n", xlab=expression(alpha), ylab=expression(beta))
+points(alpha.bad, beta.bad, col="grey")
+@
+
+
+\item The plots of the posterior draws for $\alpha$ and $\beta$ are shown below for the model with standardized dose as the predictor variable. The posterior draws for $\alpha$ have changed, but this is expected because $\alpha$ is now the log odds of death at the average dose. The posterior draws for $\beta$ have also changed, but this is also expected because now $\beta$ represents the increase in the log odds of survival for a one standardized unit increase in dose. \\
+
+I used the LD50 to compare inference between the first model and the model with standardized dose. I found the LD50 on the standardized scale first, and then transformed back to dose on the original scale. After doing so, I found that the mean LD50 is estimated to be $0.7100$, with a $95\%$ posterior interval from $0.7100$ to $0.7102$. Because these results are very similar to what I saw before dose was standardized, I conclude that standardizing dose does not change inference in this case. Also, the efficiency of the sampler has not changed noticeably.
 
 <<standardizedstanfit, echo=FALSE, message=FALSE, cache=TRUE, results='hide'>>=
 set.seed(58)
@@ -537,6 +602,10 @@ abline(v=coefs[1], col="red", lwd=3)
 beta <- extract(std.samp2)$beta
 hist(beta, freq=F, xlab=expression(beta), nclass=30, main= expression(beta))
 abline(v=coefs[2], col="red", lwd=3)
+
+ld50 <- with(frog.data, mean((0.5-alpha)/beta)*sd(dose) + mean(dose))
+l <- with(frog.data, quantile((0.5-alpha)/beta, 0.0275)*sd(dose) + mean(dose))
+u <- with(frog.data, quantile((0.5-alpha)/beta, 0.975)*sd(dose) + mean(dose))
 @
 
 \item The cauchy priors are shown below. For the intercept, the $Cauchy(0, 10)$ prior allows for the possibility of any value over the whole real line, but the probable values for the intercept are between $-30$ and $30$. This is a huge spread on the logit scale, and if we transform back to the original scale, this prior allows for the probability of death at the average dose to be between $logit^{-1}(-30) = 9.4*10^{-14}$ and $logit^{-1}(30) \approx 1$! With such a large spread on the original scale, this prior is weakly informative because it incorporates the natural constraints that the probability of death must be between $0$ and $1$. \\
@@ -550,9 +619,11 @@ lines(x, dcauchy(x, 0, 2.5), col="red", lwd=2)
 legend(-60, 0.08, c("Cauchy(0, 10)", "Cauchy(0, 2.5)"), col=c("black", "red"), lty=c(2,1))
 @
 
-\item The posterior distributions of $\alpha$ and $\beta$ are shown below. The regression lines displaying the fitted logits, and the fitted probability curves are shown for all $4000$ posterior draws are also shown.
+\item The posterior distributions of $\alpha$ and $\beta$ are shown below. The regression lines displaying the fitted logits, and the fitted probability curves for all $4000$ posterior draws are also shown. \\
 
-talk about differences...
+These results look way more reasonable than the previous results found using the improper priors. I think it's amazing that the results can change so much when transitioning from an uninformative to a weakly informative prior. The posterior mean for $\alpha$ is $-10.81$, with a 95\% posterior interval from $-27.74$ to $-2.28$, and the posterior mean for $\beta$ is $13.90$ with a $95\%$ posterior interval from $2.94$ to $37.72$. The posterior mean LD50 is $0.84$ with a $95\%$ posterior interval from $0.70$ to $1.01$.\\
+ 
+In this case, most of the posterior draws for $\alpha$ and $\beta$ are actually less extreme than the estimates from the glm() model. I think it's more reasonable that the fitted probability curves aren't as steep as the fitted curve from the glm() model (see plots below). The model seems to take into account that few data are available and the probability of death isn't {\it exactly} $1$ at a dose of $1$. In the glm() model, however, the fitted curve is so steep because it is forced to go through (or get close to) the point at (1, 1). In the Bayesian model, with the ability to incorporate prior knowledge, it's kind of like we can help the model to reflect the fact that the data don't always represent the true relationship. 
 
 <<cauchystanfit, echo=FALSE, message=FALSE, cache=TRUE, results='hide'>>=
 require(rstan)
@@ -590,7 +661,7 @@ plot(x, alpha[1] + beta[1]*x, type= "l", col="lightgrey", xlab= "dose", ylab="lo
 for(i in 2:4000){
   lines(x, alpha[i] + beta[i]*x, col="lightgrey")
 }
-abline(v = ld50.postmean, col="red", lwd=3)
+abline(v = ld50.postmean, col="darkblue", lwd=3)
 points(unique(frog.data$dose), emp.logits, pch=15, cex=1.5)
 
 #probability plot
@@ -609,16 +680,22 @@ curve(invlogit(alpha[1] + beta[1]*x), lwd=1, col="lightgrey", add=TRUE)
 for(i in 2:4000){
   curve(invlogit(alpha[i] + beta[i]*x), col="lightgrey", add=TRUE)
 }
-abline(v = ld50.postmean, col="red", lwd=3)
+curve(invlogit(coefs[1] + coefs[2]*x),
+lwd=2, col=2, add=TRUE)
+abline(v = ld50.postmean, col="darkblue", lwd=3)
 points(unique(frog.data$dose), emp.probs, pch=15, cex=1.5)
 @
 
-\item I'll use the Cauchy prior for $\alpha$ again with a smaller scale parameter. I'll use the Cauchy(0, 2) prior for $\alpha$, which makes the more likely values for $\alpha$ (the probability of death at the average dose) to be between about $0.01$ and $0.99$. This is still not very informative, but it is more informative than the Cauchy(0, 10). For $\beta$, I'll use a folded Cauchy prior. The problem does state that this drug is known to be lethal to frogs, so we should incorporate into our prior the knowledge that $\beta$ is greater than $0$. I'll use a folded Cauchy(0, 2.5). I'm still reflecting little knowledge in the magnitude of $\beta$, but this prior is more informative in the sense that it does not allow for negative values of $\beta$. The results are shown below for this model. 
+\item I'll use the Cauchy prior for $\alpha$ again with a smaller scale parameter. I'll use the Cauchy(0, 2) prior for $\alpha$, which makes the more likely values for $\alpha$ (the probability of death at a dose of $0$) to be between about $0.01$ and $0.99$. This is still not very informative, but it is more informative than the Cauchy(0, 10). For $\beta$, I'll use a folded Cauchy prior. The problem does state that this drug is known to be lethal to frogs, so we should incorporate into our prior the knowledge that $\beta$ is greater than $0$. I'll use a folded Cauchy(0, 2.5). I'm still reflecting little knowledge in the magnitude of $\beta$, but this prior is more informative in the sense that it does not allow for negative values of $\beta$. The results are shown below for this model. \\
+
+Also, I'd like to note that I realize problem (g) told us to standardize dose, but I don't think it's necessary, and the results are easier to interpret and compare across models if I don't standardize.
 
 <<cauchyagain, echo=FALSE, out.width="\\linewidth", fig.width=10>>=
 par(mfrow=c(1,2))
+x <- seq(-30, 30, by=0.01)
 plot(x, dcauchy(x, 0, 2), type="l", xlab="", main=expression(paste("Cauchy(0, 2) for ", alpha)), lwd=2, lty=2, xlim= c(-10, 10))
 
+x <- seq(0, 30, by=0.01)
 plot(x, dcauchy(x, 0, 2.5), type="l", xlab="", main=expression(paste("Folded Cauchy (0, 2.5) for ", beta)), lwd=2, lty=2, xlim= c(0, 30))
 @
 
@@ -631,6 +708,9 @@ model2.inform <- stan_model(file = "~/Documents/Stat532/exams/exam2/model2inform
                      model_name = "model2.inform")
 samp2.inform <- sampling(model2.inform, chains = 4, iter = 2000, data = data)
 @
+
+
+The posterior mean for $\alpha$ is $-7.71$, which indicates that the probability of death at a dose of $0$ is estimated to be $0.00045$, with a $95\%$ posterior interval from $4*10^{-10}$ to $0.18$. The posterior mean for $\beta$ is $9.95$, which indicates that the odds of death are estimated to increase by a multiplicative factor of $2.7$ when dose increases by $0.1$ g/ml, with a $95\%$ posterior interval from $1.24$ to $16.62$ times. The dose at which $50\%$ of frogs are expected to die is estimated to be $0.85$ g/ml, with a $95\%$ posterior interval from $0.66$ to $1.14$ g/ml.
 
 
 <<compare5, echo=FALSE, out.width="\\linewidth", fig.width=10, message=FALSE>>=
@@ -646,6 +726,50 @@ hist(beta.inform, freq=F, xlab=expression(beta), nclass=30, main= expression(bet
 abline(v=coefs[2], col="red", lwd=3)
 @
 
+<<summaries, echo=FALSE, eval=FALSE>>=
+mean(alpha.inform)
+invlogit(quantile(alpha.inform, 0.025))
+invlogit(quantile(alpha.inform, 0.975))
+
+mean(beta.inform)
+exp(quantile(beta.inform, 0.025)/10)
+exp(quantile(beta.inform, 0.975)/10)
+@
+
+<<plotreglinesinform, echo=FALSE, out.width="\\linewidth", fig.width=10, cache=TRUE>>=
+ld50 <- (0.5 - alpha.inform)/beta.inform
+ld50.postmean <- mean(ld50)
+ld50.l <- quantile(ld50, 0.0275)
+ld50.u <- quantile(ld50, 0.975)
+
+par(mfrow=c(1,2))
+#logit plot
+emp.logits <- logit(emp.probs)
+
+x <- seq(0, 3, by = 0.01)
+plot(x, alpha[1] + beta[1]*x, type= "l", col="lightgrey", xlab= "dose", ylab="logit(Pr(Death)", main="Fitted Logits", ylim=c(-50, 50))
+for(i in 2:4000){
+  lines(x, alpha.inform[i] + beta.inform[i]*x, col="lightgrey")
+}
+abline(v = ld50.postmean, col="darkblue", lwd=3)
+points(unique(frog.data$dose), emp.logits, pch=15, cex=1.5)
+
+#probability plot
+
+
+plot(frog.data$dose, fitted.probs, type="n", ylab="Pr(Death)", xlab="Dose",
+main="Fitted Probabilities")
+curve(invlogit(alpha.inform[1] + beta.inform[1]*x), lwd=1, col="lightgrey", add=TRUE)
+for(i in 2:4000){
+  curve(invlogit(alpha.inform[i] + beta.inform[i]*x), col="lightgrey", add=TRUE)
+}
+curve(invlogit(coefs[1] + coefs[2]*x),
+lwd=2, col=2, add=TRUE)
+abline(v = ld50.postmean, col="darkblue", lwd=3)
+points(unique(frog.data$dose), emp.probs, pch=15, cex=1.5)
+@
+
+
 
 \item In the histograms below, I compare the results for the models from (g) and (i). You can see the posterior draws of $\alpha$ and $\beta$ are drawn closer to $0$ in the model from part (i). \\
 
@@ -657,24 +781,24 @@ require(rstan)
 
 #alpha plot
 
-hist(alpha, freq = F, xlab=expression(alpha), nclass=40, main=expression(alpha), col="grey", ylim = c(0, 0.11))
+hist(alpha, freq = F, xlab=expression(alpha), nclass=40, main=expression(alpha), col="black", ylim = c(0, 0.11))
 abline(v=coefs[1], col="red", lwd=3)
 
 hist(alpha.inform, freq = F, nclass=30, main=expression(alpha), add=TRUE, col = "lightgreen")
 
 hist(alpha.bad, freq = F, xlab=expression(alpha), nclass=30, main=expression(alpha), add=TRUE)
-legend(-75, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("lightgrey", "lightgreen"), cex = 0.8)
+legend(-75, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("black", "lightgreen"), cex = 0.8)
 
 #beta plot
 
 hist(beta, freq=F, xlab=expression(beta), nclass=40, main= expression(beta), 
-     col="grey", ylim = c(0, 0.09))
+     col="black", ylim = c(0, 0.09))
 abline(v=coefs[2], col="red", lwd=3)
 
 hist(beta.inform, freq=F, nclass=30, main= expression(beta), add=TRUE, col = "lightgreen")
 
 hist(beta.bad, freq=F, nclass=30, add=TRUE)
-legend(20, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("lightgrey", "lightgreen"), cex = 0.8)
+legend(20, 0.07, bty="n", c("Cauchy Priors", "More Informative"), fill=c("black", "lightgreen"), cex = 0.8)
 @
 
 
@@ -726,10 +850,10 @@ Since the model generates posterior predictions under the assumption of independ
 \item A fully Bayesian hierarchical model would be as follows. This model incorporates an adjustment for each tank ($k=1,2$), and it accounts for uncertainty in the parameters for the population of tank adjustments.
 \begin{align*}
 y_{ijk} &\sim Bern(logit^{-1}(\alpha + \beta x_j + \gamma_k)) \\
-p(\alpha) &\propto 1 \\
-p(\beta) &\propto 1 \\
+\alpha &\sim Cauchy(0, 2) \\
+\beta &\sim Cauchy(0, 2.5) \\
 \gamma_k &\sim N(0, \sigma^2) \\
-p(\sigma^2) &\propto 1
+p(\sigma) &\propto 1
 \end{align*}
 
 \end{enumerate}
@@ -738,7 +862,7 @@ p(\sigma^2) &\propto 1
 
 \item Take for example the $N(0, 10000)$ prior that people sometimes use as a default 'uninformative prior' in canned software packages when they are forced to choose a proper prior. The relative density does appear to be higher for values of the parameter near $0$ (see below). But, the difference in densities is very small because the prior is spread out over such a large range of values (note the peak density is around $0.00004$). As a result, the chance of drawing a value between $0$ and $10$ isn't that much different than the chance of drawing a value between $20000$ and $20010$. This prior is uninformative in the sense that a very wide range of prior values are probable, and the difference in densities over this very wide range of values is small because the prior is so diffuse.  
 
-<<stdprior, echo=FALSE, out.width=".5\\linewidth">>=
+<<stdprior, echo=FALSE, out.width=".5\\linewidth", fig.width=7>>=
 curve(dnorm(x,0,10000), from=-40000, to=40000, col=2, lwd=2, xlab=expression(mu))
 
 #curve(dgamma(x,0.01,0.01), from=0, to=10, col=2, lwd=2, xlab=expression(tau))
@@ -748,11 +872,13 @@ curve(dnorm(x,0,10000), from=-40000, to=40000, col=2, lwd=2, xlab=expression(mu)
 
 \end{enumerate}
 
-\item The proposal distribution is a computational tool used to obtain draws from the posterior distribution. We need to get the spread and center of the proposal distribution just right to maximize efficiency of the Metropolis Hastings algorithm. So, we often look at the likelihood to get a ballpark idea of what the spread of the proposal distribution should be. The key difference between the proposal distribution and the prior distribution is that the proposal distribution does not contribute to the model at all, it is simply used in computation. If we try to use the likelihood to inform the prior distribution, we'd be using an empirical Bayes approach. If you allow the data to inform the prior, you're not doing a true Bayesian analysis.
+\item The proposal distribution is a computational tool used to obtain draws from the posterior distribution. We need to get the spread and center of the proposal distribution just right to maximize efficiency of the Metropolis Hastings algorithm. So, we often look at the likelihood to get a ballpark idea of what the spread of the proposal distribution should be. The key difference between the proposal distribution and the prior distribution is that the proposal distribution does not contribute to the model at all, it is simply used in computation. If we try to use the likelihood to inform the prior distribution, you are essentially using the data to inform the model. This is called an empirical Bayes approach and is not a true Bayesian analysis.
 
 \item The data won't always be representative of the population, and with few data it is hard to quantify the amount of variability in the population. As a result, classical inference is often wrong if few data available and are not representative of the population. The ability to incorporate prior knowledge in a Bayesian analysis can help us see when the data collected are not representative of the truth, and it can help us fit a better, more informed model. I think of the prior as a piece of known information going into the fitted model. As I saw in problems $1$ and $2$, the prior can really help to inform results and lead to reasonable posteriors even when the few data available don't seem to provide much information at all.
 
 \end{enumerate}
+
+\newpage
 
 {\Large \bf References} \\
 

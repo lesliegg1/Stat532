@@ -382,9 +382,9 @@ abline(v=0.5, lwd=3, col="red")
 
 \item \begin{enumerate}
 
-\item When I first looked at this prior, I thought he was trying to give higher density to values of $\mu$ and $\pi$ that yield smaller numbers of successes. But, on second thought, I think he was just trying to specify a vague prior over the entire range of possible expected observations. I do think he was trying to get at a non-informative prior. 
- 
-\item When I look at the plot of the Raftery Prior, it looks like small values of $\mu$ with any value of $\pi$ are most probable. When I generated draws from the priors I specified in (i), however, it looks like values of $\mu$ between $0$ and $500$ are equally likely, with $\pi$ either very close to $0$ or very close to $1$. It seems like the raftery prior makes lower expected number of observations most probable by making lower values of $\lambda$, and thus $m$, more probable. The prior used in $i$ makes values of $\lambda$ between $0$ and $500$ equally likely, and values of $\pi$ close to $0$ or $1$ are most likely across all values of $\lambda$. I included the code for this part in the appendix. 
+\item When I first looked at this prior, I thought he was trying to give higher density to values of $\mu$ and $\pi$ that yield smaller numbers of successes. But then, on second thought, I thought maybe he is trying to specify a non-informative prior by spreading density out over a large range of values for $\pi$ and $\mu$. 
+
+\item When I look at the plot of the Raftery Prior, it looks like small values of $\lambda$ with any value of $\pi$ are most probable. When I generated draws from the priors I specified in (i), however, it looks like values of $\lambda$ between $0$ and $500$ are equally likely, with values of $\pi$ close to $0$ or $1$ being most probable. These priors don't seem very similar at all. I included the code for this part in the appendix. 
 
 <<drawfrommultiprior, echo=FALSE, cache=TRUE, out.width="0.8\\linewidth", fig.width=8>>=
 set.seed(908)

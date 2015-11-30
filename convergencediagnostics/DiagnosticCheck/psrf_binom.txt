@@ -1,0 +1,10 @@
+
+    model {
+      for (i in 1:n) {
+        y[i] ~ dbin(pi[i], m)
+        logit(pi[i]) = alpha + beta * x[i]
+      }
+      
+      alpha ~ dnorm(0,10)
+      beta ~ dnorm(0,2.5)
+    }

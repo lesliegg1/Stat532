@@ -1,0 +1,12 @@
+base
+knitr
+xtable
+coda
+rjags
+R2jags
+Rcpp
+ggplot2
+rstan
+LearnBayes
+mvtnorm
+geoR

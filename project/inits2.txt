@@ -1,0 +1,1 @@
+list(xi_date_run=1.8704973E+02, omega_date_run=1.2767505E+01, alpha_date_run=-1.2492426E+00, theta=4.0000000E+00, logS=8.8800291E+00)

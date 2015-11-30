@@ -1,0 +1,7 @@
+OpenBUGS version 3.2.3 rev 1012
+model is syntactically correct
+data loaded
+model compiled
+initial values loaded and chain initialized but another chain contain uninitialized variables
+model is initialized
+model is already initialized

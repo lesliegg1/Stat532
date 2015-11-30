@@ -1,0 +1,87 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage{verbatim}
+\usepackage{pdfpages}
+\usepackage{float}
+\setlength{\topmargin}{-.8 in}
+\setlength{\textheight}{9.4  in}
+\setlength{\oddsidemargin}{-.1in}
+\setlength{\evensidemargin}{-.1in}
+\setlength{\textwidth}{6.35in}
+\include{macros}
+\begin{document}
+
+<<setup, include=FALSE, cache=FALSE>>=
+opts_chunk$set(fig.width=5, fig.height=4, out.width='\\linewidth', dev='pdf', concordance=TRUE)
+options(replace.assign=TRUE,width=72, digits = 3, 
+        show.signif.stars = FALSE)
+require(xtable, quietly=TRUE)
+require(ggplot2, quietly = T)
+require(arm, quietly = T)
+#require(arm, quietly=TRUE)
+#setwd("C:/Users/Garland/Documents/stat 532/hw 8")
+#load("hw3workspace.RData")
+@
+
+\begin{center}
+{\bf Effective Sample Size $\hat{n}_{eff}$}\\
+Garland Will \& Leslie Gains-Germain \& Matt Tyers\\
+\end{center}
+
+\noindent In Bayesian Data Analysis 3 by Gelman, et.al. effective sample size is calculated as
+
+$$\hat{n}_{eff} = \frac{mn}{1 + 2 \sum_{t=1}^{T}\widehat{\rho_t}}; \hspace{.5 in} \widehat{\rho_t} = 1- \frac{V_t}{2 \widehat{var}^+}$$
+
+\noindent In the above formula, $\widehat{var}^+$ is the marginal posterior variance, and is a weighted average of the between and within chain variance. M is the number of chains and n is the the number of draws from each chain.  $V_t$ is the variogram at each lag, where smaller $V_t$ values indicate higher correlation. \\  
+
+
+\noindent Calculation of the effective sample size $\hat{n}_{neff}$ in coda is done using a different (and much more code-efficient) technique than the algorithm presented in Chapter 11 of the Gelman, et.al. text. Function effectiveSize() first checks to see if it has been passed an MCMC list. If so, it breaks the list apart by variables and runs itself on the set of chains for each variable. Otherwise (or after this), it calls \verb+spectrum0.ar()+ to calculate the spectral density at frequency zero of each chain.  \verb+Spectrum0.ar()+ fits an autoregressive model to the chain, treating the chain as a time series. %The spectral density at frequency zero is found by using a fast fourier transform and then fitting a glm model to the chain. 
+The larger the variance left unexplained by the autoregressive model, the larger the spectral density at frequency zero, reflecting higher correlation within the chain. \\
+
+%and then divides this by the length of the chain to estimate the variance of the mean.
+
+%The spectral density spec is calculated in spectrum0.ar() as
+
+%$$spec = \frac{Variance.unexplained.by.autoregressive.model}{(1 - \sum{AutoRegressive.coefficients)^2}}$$
+
+
+\noindent If the spectral density is zero, i.e. there is no variance in the chain left unexplained by the autoregressive model, \verb+effectiveSize+ returns an effective sample size of $\hat{n}_{neff} = 0$ for the chain. If not, it returns
+
+$$\hat{n}_{eff} = \sum_{i=1}^{K}\frac{number.of.iterations * V(chain_i)}{spec_i}$$
+
+\noindent Where $V(chain_i)$ is the overall variance of chain $i$, $spec_i$ is the spectral density as described above for the $i$th chain, and $K$ is the number of chains. \\
+
+\noindent {\bf Somewhat worrisome example} \\
+\noindent This example looks at simulating three chains of length 1,000 from a multivariate normal.  All of the chains have a mean of 0, and correlation equal to 0.8.  Looking at the traceplots, the three chains are very correlated with one another.  Using the coda package to calculate effective sample size on each chain, we get values above 1,000 which is the number of draws for each chain. This serves as an illustration that n effective as calculated in coda is not a perfect diagnostic tool, as having an effective sample size greater than the number of draws is not reasonable.  Also worth noting is that coda calculates n effective strictly within each chain.  The method from the BDA3 on the other hand uses a variance that is a weighted average of the between and within chain variance.  
+<<interesting.example, echo = T, results = 'hide', fig.align = 'center', fig.width = 13, fig.height = 4, message= F, warnings = F>>=
+set.seed(38)
+require(coda, quietly = T)
+require(mvtnorm, quietly = T)
+d <- matrix(c(1, 0, 0, 0, 1, 0, 0, 0, 1), nrow = 3, ncol = 3)
+r <- matrix(c(1, 0.8, 0.8, 0.8, 1, 0.8, 0.8, 0.8, 1), nrow = 3, ncol = 3)
+v <- d %*% r %*% d
+chains <- rmvnorm(1000, c(0, 0, 0), sigma = sqrt(v))
+@
+
+<<plots, echo = F, results = 'hide', fig.align = 'center', fig.width = 10, fig.height = 4, message= F, warnings = F>>=
+mvn.chains <- chains
+x <- seq(1, 1000)
+plot(chains[, 1] ~ x, type = "l", col = 2, main = "Non - Stationary Correlated Chains",
+ylab = "Simulated Value", xlab = "Iteration", ylim = c(-3, 2))
+lines(chains[, 2] ~ x, col = 3)
+lines(chains[, 3] ~ x, col = 4)
+
+mvn.chains <- mcmc(mvn.chains)
+mvn.chains.list <- mcmc.list(mvn.chains[, 1], mvn.chains[, 2], mvn.chains[,
+3])
+mvn_chains_size <- effectiveSize(mvn.chains)
+@
+
+<<output, echo = F, results= 'asis'>>=
+dat1 <- data.frame(unlist(mvn_chains_size))
+rownames(dat1) <- c("Chain 1", "Chain 2", "Chain 3")
+colnames(dat1) <- c("Effective Sample Size")
+print(xtable(dat1, caption = "Effective sample size"), floating = T, 
+      table.placement = "H", caption.placement = "top")
+@
+\end{document}

@@ -1,0 +1,721 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{float}
+
+\usepackage{amssymb,amsmath}
+\usepackage{enumerate}
+\usepackage{float}
+\usepackage{verbatim}
+\usepackage{setspace}
+\usepackage{multicol}
+
+
+\setlength{\textwidth}{6.5in}
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+\setlength{\maxwidth}{6.5in}
+
+\title{\vspace{-2.0cm} Stat 532 Project: Statistical arrival models to estimate missed passage counts at fish weirs}
+\author{By Suresh Andrew Sethi and Catherine Bradley, Project by Leslie Gains-Germain}
+\date{Fall 2015}
+
+\begin{document}
+<<setup, include=FALSE, cache=FALSE,echo=FALSE>>=
+require(knitr)
+opts_chunk$set(fig.width=5, fig.height=4, out.width='\\linewidth', dev='pdf', concordance=TRUE,tidy.opts=list(width.cutoff=60, keep.blank.line=FALSE), size='footnotesize')
+options(replace.assign=TRUE,width=112, digits = 3, max.print="72",
+        show.signif.stars = FALSE)
+require(xtable)
+@
+
+\maketitle
+\tableofcontents
+
+\newpage
+
+\section{Introduction}
+
+The goal of this paper is to provide a new method for imputing passage counts on missed dates when enumerating fish passing by a weir. A weir is a device, pictured below, designed to span an entire stream and count every single fish that passes by. 
+
+\begin{center}
+\includegraphics[scale=0.5]{weir.png}
+\end{center}
+
+\noindent Weirs do not always operate as intended, however. High water can destroy a weir, bears can interfere with the weir or the weir operator, and ice can delay the installation or require early removal of a weir. \\
+
+\noindent Sethi and Bradley explain that the current method used to impute passage counts on missing dates ``typically involve a ``connect-the-dots'' linear interpolation scheme (e.g. Gewin et al. 2005; Johnson et al. 2007)''. They explain that while this method is easy to implement, it has two main drawbacks. First, it does not provide uncertainty in the missing passage estimates, and second it cannot estimate missing dates at the beginning and end of the run. \\
+
+\noindent The methods proposed by Sethi and Bradley in this paper solve both of these drawbacks. They use a parametric curve to describe the passage of a run of fish at a weir (referred to as the arrival model), and a separate probability model to describe the variability of fish counts around the run curve. The following quote is a nice summary of their reasons for using Bayesian implementation.
+\begin{quote}
+Models are fit in a Bayesian framework, providing a straightforward means to summarize uncertainty about total run size estimates, arrival model characteristics (e.g. peak run date), and estimates of predicted passage counts on missing-observation dates (Sethi and Bradley 5).
+\end{quote}
+
+\noindent The main research goal is to provide a new method for estimating total run size and missed passage counts. The secondary research goal is to estimate parameters of the arrival model that describe the passage of fish over time.
+
+
+\section{Model}
+
+First, they specify the run curves, or arrival models, that describe the passage of fish over time at a weir. They use two common cumulative distribution functions to describe the run curves, the normal distribution and the skew normal distribution. It is important to note that they could have used any parametric curve for this purpose, but they chose common cumulative distribution functions for convenience. The following quote provides a nice concise explanation.
+\begin{quote}
+To avoid confusion, it is worth emphasizing that the cumulative distribution functions used to specify arrival dynamics do not represent probability models for weir passage counts; they are merely convenient mathematical functions to describe the shape of the arrival curve of fish at a weir (Sethi and Bradley 8).
+\end{quote}
+
+\noindent Below, I use the same notation they use in the paper because I think it's really clear. \\
+
+{\bf Normal Run Curve}  \hfill $p_t = F_N(\mu, \sigma) = \frac{1}{\sigma\sqrt{2\pi}} \int_{-\infty}^t e^{\frac{-(\nu - \mu)^2}{2\sigma^2}}d\nu$ \\
+
+{\bf Skew Normal Run Curve} \hfill $p_t = F_{SN}(t|\xi, \omega, \alpha) = \frac{2}{\omega}\phi(\frac{t-\xi}{\omega}) \Phi(\frac{\alpha(t-\xi)}{\omega})$ \\
+
+\noindent where $p_t$ is the cumulative proportion of the run that has passed the weir at time step $t$. A time step $t$ is defined as a $24$ hour day because daily counts are commonly recorded as weir data. \\
+
+\noindent $F_N$ and $F_{SN}$ are the cumulative distribution functions for the normal and skew normal distributions, respectively. $\mu$ and $\sigma$ are the location and scale parameters for the normal model. For the skew normal model, $\xi$ is the location parameter, $\omega$ is the scale parameter, and $\alpha$ is the shape parameter. $\phi$ is the standard normal density function and $\Phi$ is the standard normal cumulative distribution function.\\
+
+\noindent Daily passage counts are calculated as follows.
+
+$$c_t = S(p_t - p_{t-1})$$
+
+\noindent where $c_t$ is a daily passage count for a given run curve and $S$ is the total run size scalar. \\
+
+\noindent Below are the priors for the parameters of the normal run curve:
+\begin{align*}
+\mu &\sim Unif(150, 300) \hspace{2in} f(\mu) = \frac{1}{150} I(\mu)_{(150, 300)} \\
+\sigma &\sim Unif(1, 50) \hspace{2in} f(\sigma) = \frac{1}{49} I(\sigma)_{(1, 50)} \\
+log(S) &\sim N(7.5, 4.0) \hspace{2in} 
+f(log(S)) = \frac{1}{\sqrt{8\pi}}e^{-\frac{(log(S)-7.5)}{8}}  
+\end{align*}
+
+\noindent Below are the priors for the parameters of the skew-normal run curve:
+\begin{align*}
+\xi &\sim Unif(150, 300) \hspace{2in} f(\xi) = \frac{1}{150} I(\xi)_{(150, 300)} \\
+\omega &\sim Unif(1, 50) \hspace{2in} f(\omega) = \frac{1}{49} I(\omega)_{(1, 50)} \\
+\alpha &\sim Unif(-10, 10) \hspace{2in} f(\alpha) = \frac{1}{20} I(\alpha)_{(-10, 10)} \\
+log(S) &\sim N(7.5, 4.0) \hspace{2in} 
+f(log(S)) = \frac{1}{\sqrt{8\pi}}e^{-\frac{(log(S)-7.5)}{8}}  
+\end{align*}
+
+\noindent Next, a probability model is used to describe the amount of variation in the passage counts around the run curve. \\
+
+{\bf Normal Process Variation}  \hfill  $c_t^0 \sim N(c_t, \tau)$ \\
+
+{\bf Negative Binomial Process Variation} \hfill $c_t^0 \sim NegBinom(\lambda = \frac{\theta}{\theta + c_t}, \theta)$ \\
+
+\noindent where $c_t^0$ is an observed passage count, $\tau$ is the variance of the normal model, and $\theta$ is the dispersion parameter of the negative binomial model. \\
+
+\noindent Below are the priors for the parameters of the normal process variation model:
+\begin{align*}
+\tau &\sim Unif(0.1, 1000) \hspace{2in} f(\tau) = \frac{1}{999.9} I(\tau)_{(0.1, 1000)} 
+\end{align*}
+
+\noindent Below are the priors for the parameters of the negative binomial process variation model:
+\begin{align*}
+\theta &\sim Gam(0.1, 0.1) \hspace{2in} f(\theta) = \frac{\theta^{-0.9}0.1^{0.1}e^{-0.1\theta}}{\Gamma(0.1)}
+\end{align*}
+
+%% talk about shapes of each run curve and error model and what they mean, and how they incorporate prior knowledge
+
+%% talk about choice of priors for each
+
+\section{Simulation of artificial data}
+
+I started by writing my own code to simulate data. During the process, I realized that code for simulating data is included in the paper. I compared my code to the code they used for simulations, and I decided to show their code here (cleaned up a little bit by me) and include a thorough description of what they did. It was pretty similar to the code I wrote, but sometimes I learn more by going through someone else's code than I do from writing my own code, especially having first written it myself. \\
+
+\noindent They started by defining the skew normal run curve. The location parameter of the skew normal run curve ($\xi$) was set at $185$ because sets the run peak to occur around the $4$th of July. The scale parameter ($\omega$) was set at $7.5$ because this produces a run of about two months long. This makes sense, because salmon usually run up the river in the summer, and the run usually lasts about two months. The skew parameter ($\alpha$) was set to $0$ in the simulations. The total run size was set at $10000$ fish.\\
+
+They used the \verb+psn+ function in the \verb+sn+ package to define the skew normal run curve. After defining the passage counts for each day according to the run curve, they simulated observed passage counts by taking random draws from a negative binomial distribution centered at the run curve with dispersion parameter equal to $7$. The overdispersion parameter was set to $7$ and ``was chosen to reflect variation observed in actual Yukon River Pacific Salmon data (Sethi and Bradley $12$).''
+
+<<fromthepaper, echo=TRUE, message=FALSE>>=
+#Simulate "true" data modeled after Pacific Salmon runs: Normal arrival curve model, 
+#run size = 10,000 fish,
+#negative binomial process error
+set.seed(205) # set random seed if desired
+
+# Normal-curve shaped arrival model parameters
+true.day.v <- 1:365 # model time steps, modeled as 24 hour days, e.g. Julian days
+skew <- sample(c(-2, 2), size = 1, prob = rep(1/3, 2)) # randomly draw a skew (-2 or 2)
+run.mu <- 185 # results in a mode on approximately 4th of July peak run
+run.sd <- 7.5 # produces a run of about 40 days long
+S <- 10000 # 10k fish run
+
+#Negative Binomial variation parameter
+theta <- 7.0 #overdispersion based on Pacific salmon data
+
+# simulate run arrival under the arrival model
+# for convenience the sn package is used, defining a skewnormal with shape = 0, 
+#i.e. Normal distribution
+require(sn)
+true.run.v <- S*(psn(true.day.v, xi = run.mu, omega = run.sd, alpha = skew, 
+                     engine = "biv.nt.prob") 
+                 - psn(true.day.v - 1, xi = run.mu, omega = run.sd, alpha = skew, 
+                       engine = "biv.nt.prob"))
+
+# simulate observed data under process error
+real.dat.v <- rnbinom(n = length(true.run.v), mu = true.run.v, size = theta)
+
+# note, ignore NA warnings here as these are due to rounding issues producing 
+#very small negative counts in tails
+@
+
+\noindent Then, they set starting and ending observation days at the weir, day $160$ and $210$, corresponding to early June and late July, spanning the two month run. They did this to prevent numerical difficulties that would occur from small predicted estimates in the tails of the run. To bracket the beginning and ends of the run, they inserted known zero passage days before and after the run. These zero passage days reflect prior knowledge about when the run occurs. They chose to incorporate this prior knowledge because preliminary analyses indicated that including these known zero passage days sped up convergence, particularly when data were missing in the tails of the run (Sethi and Bradley $11$). In the paper, they discuss sensitivity of the results to the placement of the zero passage dates (Sethi and Bradley $47$). In the simulation shown here, they inserted known zero passage days before and after the run on days $144, 145, 225$ and $226$.  
+
+<<sim, echo=TRUE>>=
+#Simulate observations at the weir with missing data following the "Weekends Off" scenario
+#(observe 5, miss 2 days, ...)
+obs.start <- 160 # first day to observe at weir, e.g. June 9th by this example
+obs.end <- 210 # last day to observe at weir, e.g. July 29th by this example
+obs.dat.v <- data.frame(Date = true.day.v[obs.start:obs.end], 
+                        Count = real.dat.v[obs.start:obs.end])
+
+# include known-zero passage days
+# Here, zero-passage dates before observation are equivalent to May 24 and 25
+#post-observation zero-passage dates are equivalent to August 13 and 14
+obs.dat.v <- rbind(data.frame(Date=144:145, Count=0), 
+                   obs.dat.v, data.frame(Date=225:226, Count=0))
+@
+
+\noindent The simulated observed data, before data was removed to represent missing data, is shown below.
+
+<<plotdat, echo=FALSE, fig.width=8>>=
+##plot simulated data
+plot(x = obs.dat.v$Date, y = obs.dat.v$Count, xlim = c(125, 265),
+     ylim=c(0,1.5*max(obs.dat.v$Count)), type="p", col="red", pch=19, 
+     bty="l", xlab="Sample date (Julian day)", ylab="Passage count (fish)",
+     main = "Observed Data - None Missing")
+lines(x = true.day.v, y = true.run.v, lwd = 2, col = "red")
+legend(x = "topright", legend = c("Arrival model", "Realized passage with process error"),
+       lty = c(1, 1), lwd = 2, seg.len = c(2, 0), pch = 19, 
+       pt.cex = c(0, 1.25), col = c("red", "red"), bty = "n", cex = .8)
+@
+
+\noindent The following code removes some of the data to represent a ``weekends off'' scenario where data are missing from the weekends. The plot below shows the data after the missing dates have been removed.
+
+<<simoff, echo=TRUE>>=
+
+# remove "weekend" data, i.e. sample for five days, take two off, sample five days...
+`%notin%`<- Negate(`%in%`) # helper function
+knockout.date.v <- obs.dat.v[1:nrow(obs.dat.v) %in%
+                               c(seq(from=6,to=nrow(obs.dat.v),by=7),
+                                 seq(from=7,to=nrow(obs.dat.v),by=7)), "Date"] #missed weekends
+knockout.passage.v <- obs.dat.v[obs.dat.v$Date %in% knockout.date.v, "Count"] # missed passages
+obs.dat.v <- obs.dat.v[obs.dat.v$Date %notin% knockout.date.v, ] #remove weekend passages from dataset
+@
+
+<<plotall, echo=FALSE, fig.width = 8>>=
+#Take a look at the simulated "true" data and "observed" data with missing passage dates
+plot(x=obs.dat.v$Date,y=obs.dat.v$Count,xlim=c(125,265),
+     ylim=c(0,1.5*max(obs.dat.v$Count)),type="p",col="red", pch=19,bty="l",
+     xlab="Sample date (Julian day)",ylab="Passage count (fish)", main = "Observed Data - Weekends Off")
+points(x=knockout.date.v,y=knockout.passage.v,pch=19)
+lines(x=true.day.v[150:250],real.dat.v[150:250],type="l")
+lines(x=true.day.v[150:250],true.run.v[150:250],type="l",col="red",lwd=2)
+legend(x="topright", legend=c("Arrival model","Realized passage with process error
+                              ","Missed passage date"), lty=c(1,1,1),lwd=2,
+       seg.len=c(2,0,0),pch=19,pt.cex=c(0,1.25,1.25),col=c("red","red","black"),
+       bty="n", cex=.8)
+@
+
+\noindent The following code removes data in the early tail of the run to represent a scenario where the weir couldn't be installed until after the run had began. The plot below shows the data with the initial $15\%$ removed.
+
+<<simagain, include=FALSE>>=
+#Simulate observations at the weir with missing data following the "Weekends Off" scenario
+#(observe 5, miss 2 days, ...)
+obs.start <- 160 # first day to observe at weir, e.g. June 9th by this example
+obs.end <- 210 # last day to observe at weir, e.g. July 29th by this example
+obs.dat.v <- data.frame(Date = true.day.v[obs.start:obs.end], 
+                        Count = real.dat.v[obs.start:obs.end])
+
+# include known-zero passage days
+# Here, zero-passage dates before observation are equivalent to May 24 and 25
+#post-observation zero-passage dates are equivalent to August 13 and 14
+obs.dat.v <- rbind(data.frame(Date=144:145, Count=0), 
+                   obs.dat.v, data.frame(Date=225:226, Count=0))
+@
+
+<<simofftail, echo=TRUE>>=
+
+# remove first 15% of data
+`%notin%`<- Negate(`%in%`) # helper function
+knockout.date.v <- obs.dat.v[3:11, "Date"] #missed early tail
+knockout.passage.v <- obs.dat.v[obs.dat.v$Date %in% knockout.date.v, "Count"] # missed passages 
+#(initial 15%)
+obs.dat.v <- obs.dat.v[obs.dat.v$Date %notin% knockout.date.v, ] #remove intial 15%
+@
+
+<<plotalltail, echo=FALSE, fig.width = 8>>=
+#Take a look at the simulated "true" data and "observed" data with missing passage dates
+plot(x=obs.dat.v$Date,y=obs.dat.v$Count,xlim=c(125,265),
+     ylim=c(0,1.5*max(obs.dat.v$Count)),type="p",col="red", pch=19,bty="l",
+     xlab="Sample date (Julian day)",ylab="Passage count (fish)", main = "Observed Data - Initial 15% Missing")
+points(x=knockout.date.v,y=knockout.passage.v,pch=19)
+lines(x=true.day.v[150:250],real.dat.v[150:250],type="l")
+lines(x=true.day.v[150:250],true.run.v[150:250],type="l",col="red",lwd=2)
+legend(x="topright", legend=c("Arrival model","Realized passage with process error
+                              ","Missed passage date"), lty=c(1,1,1),lwd=2,
+       seg.len=c(2,0,0),pch=19,pt.cex=c(0,1.25,1.25),col=c("red","red","black"),
+       bty="n", cex=.8)
+@
+
+They also did a simulation where the four days around the peak of the run was missed, but I chose not to look at that scenario. For each scenario, they simulated $150$ datasets, and fit the model to each. Because this is so computationally intensive, I chose to only replicate the scenario in which the intial $15\%$ of the run was missed. This scenario seemed to be the most interesting when estimating total run size and other run curve characteristics, and when comparing performance to the linear interpolation method.
+
+
+\section{Model fitting and results}
+
+
+<<modelfrompaper, echo=FALSE, eval=FALSE>>=
+setwd("~/Documents/Stat532/project")
+sink("skewNormalArrival.NegativeBinomialErrorProcess.txt")
+cat("
+model {
+# Input data:
+# Date = vector of sampling dates
+# Count = vector of weir passage counts to accompany sampling dates
+# T = number of sampling occasions (i.e. length of Count vector)
+# MDate = vector of missing sampling dates to predict
+# M = number of missing sampling dates to predict
+# invl = number of intervals to parse a time step for numerical integration by trapezoid rule
+
+# Parameters fit in the model
+# xi_date_run = location parameter of skewNormal arrival curve
+# omega_date_run = scale parameter of skewNormal arrival curve
+# alpha_date_run = shape parameter of skewNormal arrival curve
+# theta = overdispersion parameter for error process
+# S = the total run size scalar
+
+# Derived parameters estimated in the model
+# Mpred: vector of passage predictions for missing dates specified in MDate
+# RunSize: sum of predicted missing passage counts plus observed counts
+# priors
+
+xi_date_run ~ dunif(150,300)
+omega_date_run ~ dunif(1,50)
+alpha_date_run ~ dunif(-10,10)
+logS ~ dnorm(7.5,.25)
+log(S) <- logS # effectively flat prior for run size scalar
+theta ~ dgamma(0.1,0.1) # negative binomial over dispersion parameter
+
+# likelihood contributions
+# Step 1: calculate the estimated proportion of the run that passes in time step i
+# numerical integration to approximate cdf from the pdf of skewnormal,(e.g. Azzalini 1985)
+for(i in 1:T){
+# numerical integration, intervals = invl, integration interval = 1 time unit, such that h = 1/invl
+for(j in 1:invl){
+store[j,i] <- (2/omega_date_run) * (1/sqrt(2*3.14159))*
+(
+exp(-.5* pow((((Date[i]+(j/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((Date[i]+(j/invl))-xi_date_run)/omega_date_run)) +
+exp(-.5* pow((((Date[i]+((j-1)/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((Date[i]+((j-1)/invl))-xi_date_run)/omega_date_run))
+)
+} # end j loop, sum over numerical integration vector
+prop[i] <- (.5/invl)*sum(store[,i])
+} # end i loop
+
+# Step 2: calculate predicted observed passage Counts for sampled dates and their likelihood
+for(i in 1:T){
+pred[i] <- round(prop[i]*S)
+pred.star[i] <- theta/(theta+pred[i]) #reparameterizing WinBUGS negative binomial, 
+#see main text
+
+temp.Count[i] <- round(Count[i])
+temp.Count[i] ~ dnegbin(pred.star[i],theta) # negative binomial likelihood
+} # end likelihood
+# derived quantities
+# predicted missing dates
+for(i in 1:M){
+# numerical integration, intervals = invl, integration interval = 1 time unit, such that h = 1/invl
+for(j in 1:invl){
+Mstore[j,i] <- (2/omega_date_run) * (1/sqrt(2*3.14159))*
+(
+exp(-.5* pow((((MDate[i]+(j/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((MDate[i]+(j/invl))-xi_date_run)/omega_date_run)) +
+exp(-.5* pow((((MDate[i]+((j-1)/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((MDate[i]+((j-1)/invl))-xi_date_run)/omega_date_run))
+)
+} # end j loop, sum over numerical integration vector
+Mprop[i] <- (.5/invl)*sum(Mstore[,i])
+Mpred[i] <- Mprop[i]*S
+} # end i loop
+
+# reconstruct total run treating observed passage counts as known quantities
+RunSize <- sum(Count[])+sum(Mpred[])
+
+# reference: Azzalini, A. 1985. A class of distributions which includes the Normal ones. #Scand. J. Stats. 12:171.
+} # end model
+",fill=T)
+sink()
+@
+
+<<fitmodel, echo=FALSE, eval=FALSE>>=
+#Package data for WinBUGS and fit the skew-Normal arrival with Negative Binomial
+#process error statistical arrival model
+# bundle data for WinBUGS
+win.data <- list(Date=obs.dat.v$Date,Count=obs.dat.v$Count, T=length(obs.dat.v$Count),
+                 invl=20)
+s.date <- win.data$Date[1]
+e.date <- win.data$Date[length(win.data$Date)]
+
+# add in the desired missing dates for prediction
+`%notin%`<- Negate(`%in%`) # helper function
+miss.dates <- seq(from=s.date,to=e.date, by=1)[seq(from=s.date,to=e.date,by=1) %notin% win.data$Date]
+
+win.data$MDate <- miss.dates
+win.data$M <- length(miss.dates)
+
+require(R2OpenBUGS)
+# specify 'inits' function for WinBUGS
+inits <- function(){list(
+xi_date_run=win.data$Date[win.data$Count==max(win.data$Count, na.rm=T)][1]+runif(1,-2,2),
+omega_date_run=12+runif(1,-1,1),
+alpha_date_run=0+runif(1,-2,2),
+theta=5+sample(c(-2,-1,1,2),1),
+logS=log(sum(win.data$Count))
+)}
+# specify parameters to track
+params <- c("xi_date_run","omega_date_run","alpha_date_run","theta","S","RunSize")
+# MCMC settings:
+nc = 2; ni = 10000; nb = 5000; nt = 10
+# Run Gibbs sampler to implement MCMC estimation of the model under Bayesian specification
+# Output true realized run size and estimated run size (i.e. sum of imputed passage + observed passage)
+fit <- bugs(data=win.data,inits=inits, parameters=params,
+model = "skewNormalArrival.NegativeBinomialErrorProcess.txt", n.thin=nt, n.chains=nc,
+n.burnin=nb, n.iter=ni, debug=F, digits=7, working.directory=getwd() )
+(results <- data.frame(TrueRunSize=sum(real.dat.v,na.rm=T),TotalObsevedPasage=sum(obs.dat.v$Count,na.rm=T),
+EstimatedRunSize=median(fit$sims.list$RunSize,na.rm=T)))
+@
+
+<<normnorm, echo=FALSE>>=
+sink("NormalArrival.NormalErrorProcess.txt")
+cat("
+model {
+# Input data:
+# Date = vector of sampling dates
+# Count = vector of weir passage counts to accompany sampling dates
+# T = number of sampling occasions (i.e. length of Count vector)
+# MDate = vector of missing sampling dates to predict
+# M = number of missing sampling dates to predict
+
+# Parameters fit in the model
+# mu_date_run = location parameter of Normal arrival curve, equivalent to run peak (i.e. mode)
+# sigma_date_run = scale parameter of Normal arrival curve
+# sigma_fit = scale parameter for error process
+# S = the total run size scalar
+
+# Derived parameters estimated in the model
+# Mpred: vector of passage predictions for missing dates specified in MDate
+# RunSize: sum of predicted missing passage counts plus observed counts
+# priors
+mu_date_run ~ dunif(150,300)
+sigma_date_run ~ dunif(1,50)
+sigma_fit ~ dunif(.1,1000)
+tau_fit <- 1/(sigma_fit*sigma_fit) # error process (Normal likelihood), WinBUGS takes precision
+logS ~ dnorm(7.5 ,.25)
+log(S) <- logS # effectively flat prior for run size scalar
+# likelihood contributions
+# Step 1: calculate the estimated proportion of the run that passes in time step i
+for(i in 1:T){
+prop[i] <- (phi(((Date[i]+0)-mu_date_run)/sigma_date_run) - phi(((Date[i]-1)-mu_date_run)/sigma_date_run))
+} # end i loop
+# Step 2: calculate predicted observed passage Counts for sampled dates and their likelihood
+for(i in 1:T){
+pred[i] <- prop[i]*S
+Count[i] ~ dnorm(pred[i],tau_fit)# Normally distributed deviates
+} # end likelihood
+# derived quantities
+# predicted missing dates
+for(i in 1:M){
+Mprop[i] <- (phi(((MDate[i]+0)-mu_date_run)/sigma_date_run) - phi(((MDate[i]-1)-mu_date_run)/sigma_date_run))
+Mpred[i] <- Mprop[i]*S
+} # end i loop
+# reconstruct total run treating observed passage counts as known quantities
+RunSize <- sum(Count[])+sum(Mpred[])
+} # end model
+",fill=T)
+sink()
+@
+
+<<callnormorm, echo=FALSE>>=
+#Fit the Normal Arrival - Normal Process Error model
+# specify 'inits' function for WinBUGS
+inits <- function(){list(
+mu_date_run=win.data$Date[win.data$Count==max(win.data$Count, na.rm=T)][1]+runif(1,-2,2),
+sigma_date_run=12+runif(1,-1,1),
+sigma_fit=5+sample(c(-2,-1,1,2),1),
+logS=log(sum(win.data$Count))
+)}
+# specify parameters to track
+params <- c("mu_date_run", "sigma_date_run", "sigma_fit", "S","RunSize")
+# MCMC settings:
+nc = 2; ni = 10000; nb = 5000; nt = 10
+# Run Gibbs sampler to implement MCMC estimation of the model under Bayesian specification
+# Output true realized run size and estimated run size (i.e. sum of imputed passage + observed passage)
+fit.normal <- bugs(data=win.data,inits=inits, parameters=params,
+model = "NormalArrival.NormalErrorProcess.txt", n.thin=nt, n.chains=nc,
+n.burnin=nb, n.iter=ni, debug=F, digits=7, working.directory=getwd() )
+(results <- data.frame(TrueRunSize=sum(real.dat.v,na.rm=T),TotalObsevedPasage=sum(obs.dat.v$Count,na.rm=T),
+EstimatedRunSize=median(fit$sims.list$RunSize,na.rm=T)))
+@
+
+<<normnegbinom, echo=FALSE>>=
+sink("NormalArrival.NegativeBinomialErrorProcess.txt")
+cat("
+model {
+# Input data:
+# Date = vector of sampling dates
+# Count = vector of weir passage counts to accompany sampling dates
+# T = number of sampling occasions (i.e. length of Count vector)
+# MDate = vector of missing sampling dates to predict
+# M = number of missing sampling dates to predict
+# Parameters fit in the model
+# mu_date_run = location parameter of Normal arrival curve, equivalent to run peak (i.e. mode)
+# sigma_date_run = scale parameter of Normal arrival curve
+# theta = overdispersion parameter for error process
+# S = the total run size scalar
+# Derived parameters estimated in the model
+# Mpred: vector of passage predictions for missing dates specified in MDate
+# RunSize: sum of predicted missing passage counts plus observed counts
+# priors
+mu_date_run ~ dunif(150,300)
+sigma_date_run ~ dunif(1,50)
+logS ~ dnorm(7.5,.25)
+log(S) <- logS # effectively flat prior for run size scalar
+theta ~ dgamma(0.1,0.1) # negative binomial over dispersion parameter
+# likelihood contributions
+# Step 1: calculate the estimated proportion of the run that passes in time step i
+for(i in 1:T){
+prop[i] <- (phi(((Date[i]+0)-mu_date_run)/sigma_date_run) - phi(((Date[i]-1)-mu_date_run)/sigma_date_run))
+} # end i loop
+# Step 2: calculate predicted observed passage Counts for sampled dates and their likelihood
+for(i in 1:T){
+pred[i] <- round(prop[i]*S)
+pred.star[i] <- theta/(theta+pred[i]) #reparameterizing WinBUGS negative binomial, see main text
+temp.Count[i] <- round(Count[i])
+temp.Count[i] ~ dnegbin(pred.star[i],theta) # negative binomial likelihood
+} # end likelihood
+# derived quantities
+# predicted missing dates
+for(i in 1:M){
+Mprop[i] <- (phi(((MDate[i]+0)-mu_date_run)/sigma_date_run) - phi(((MDate[i]-1)-mu_date_run)/sigma_date_run))
+Mpred[i] <- Mprop[i]*S
+} # end i loop
+# reconstruct total run treating observed passage counts as known quantities
+RunSize <- sum(Count[])+sum(Mpred[])
+} # end model
+",fill=T)
+sink()
+@
+
+<<fitnormnegbinom, echo=FALSE>>=
+# specify 'inits' function for WinBUGS
+inits <- function(){list(
+mu_date_run=win.data$Date[win.data$Count==max(win.data$Count, na.rm=T)][1]+runif(1,-2,2),
+sigma_date_run=12+runif(1,-1,1),
+theta=5+sample(c(-2,-1,1,2),1),
+logS=log(sum(win.data$Count))
+)}
+# specify parameters to track
+params <- c("mu_date_run","sigma_date_run","theta","S","RunSize")
+# MCMC settings:
+nc = 2; ni = 10000; nb = 5000; nt = 10
+# Run Gibbs sampler to implement MCMC estimation of the model under Bayesian specification
+# Output true realized run size and estimated run size (i.e. sum of imputed passage + observed passage)
+fit <- bugs(data=win.data,inits=inits, parameters=params,
+model = "NormalArrival.NegativeBinomialErrorProcess.txt", n.thin=nt, n.chains=nc,
+n.burnin=nb, n.iter=ni, debug=F, digits=7, working.directory=getwd() )
+(results <- data.frame(TrueRunSize=sum(real.dat.v,na.rm=T),TotalObsevedPasage=sum(obs.dat.v$Count,na.rm=T),
+EstimatedRunSize=median(fit$sims.list$RunSize,na.rm=T)))
+@
+
+<<fitskewnormnorm, echo=FALSE>>=
+sink("skewNormalArrival.NormalErrorProcess.txt")
+cat("
+model {
+# Input data:
+# Date = vector of sampling dates
+# Count = vector of weir passage counts to accompany sampling dates
+# T = number of sampling occasions (i.e. length of Count vector)
+# MDate = vector of missing sampling dates to predict
+# M = number of missing sampling dates to predict
+# invl = number of intervals to parse a time step for numerical integration by trapezoid rule
+# Parameters fit in the model
+# xi_date_run = location parameter of skewNormal arrival curve
+# omega_date_run = scale parameter of skewNormal arrival curve
+# alpha_date_run = shape parameter of skewNormal arrival curve
+# sigma_fit = scale parameter for error process
+# S = the total run size scalar
+# Derived parameters estimated in the model
+# Mpred: vector of passage predictions for missing dates specified in MDate
+# RunSize: sum of predicted missing passage counts plus observed counts
+
+# priors
+xi_date_run ~ dunif(150,300)
+omega_date_run ~ dunif(1,50)
+alpha_date_run ~ dunif(-10,10)
+sigma_fit ~ dunif(.1,1000)
+tau_fit <- 1/(sigma_fit*sigma_fit) # error process (Normal likelihood), WinBUGS takes precision
+logS ~ dnorm(7.5,.25)
+log(S) <- logS # effectively flat prior for run size scalar
+# likelihood contributions
+# Step 1: calculate the estimated proportion of the run that passes in time step i
+# numerical integration to approximate cdf from the pdf of skewnormal,(e.g. Azzalini 1985)
+for(i in 1:T){
+# numerical integration, intervals = invl, integration interval = 1 time unit, such that h = 1/invl
+for(j in 1:invl){
+store[j,i] <- (2/omega_date_run) * (1/sqrt(2*3.14159))*
+(
+exp(-.5* pow((((Date[i]+(j/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((Date[i]+(j/invl))-xi_date_run)/omega_date_run)) +
+exp(-.5* pow((((Date[i]+((j-1)/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((Date[i]+((j-1)/invl))-xi_date_run)/omega_date_run))
+)
+} # end j loop, sum over numerical integration vector
+prop[i] <- (.5/invl)*sum(store[,i])
+} # end i loop
+# Step 2: calculate predicted observed passage Counts for sampled dates and their likelihood
+for(i in 1:T){
+pred[i] <- prop[i]*S
+Count[i] ~ dnorm(pred[i],tau_fit)# Normally distributed deviates
+} # end likelihood
+# derived quantities
+# predicted missing dates
+for(i in 1:M){
+# numerical integration, intervals = invl, integration interval = 1 time unit, such that h = 1/invl
+for(j in 1:invl){
+Mstore[j,i] <- (2/omega_date_run) * (1/sqrt(2*3.14159))*
+(
+exp(-.5* pow((((MDate[i]+(j/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((MDate[i]+(j/invl))-xi_date_run)/omega_date_run)) +
+exp(-.5* pow((((MDate[i]+((j-1)/invl))-xi_date_run)/omega_date_run),2)) *
+phi(alpha_date_run *(((MDate[i]+((j-1)/invl))-xi_date_run)/omega_date_run))
+)
+} # end j loop, sum over numerical integration vector
+Mprop[i] <- (.5/invl)*sum(Mstore[,i])
+Mpred[i] <- Mprop[i]*S
+} # end i loop
+# reconstruct total run treating observed passage counts as known quantities
+RunSize <- sum(Count[])+sum(Mpred[])
+# reference: Azzalini, A. 1985. A class of distributions which includes the Normal ones. #Scand. J. Stats. 12:171.
+} # end model
+",fill=T)
+sink()
+@
+
+
+<<fitskewnormnorm, echo=FALSE>>=
+# specify 'inits' function for WinBUGS
+inits <- function(){list(
+xi_date_run=win.data$Date[win.data$Count==max(win.data$Count, na.rm=T)][1]+runif(1,-2,2),
+omega_date_run=12+runif(1,-1,1),
+alpha_date_run=0+runif(1,-2,2),
+sigma_fit=5+sample(c(-2,-1,1,2),1),
+logS=log(sum(win.data$Count))
+)}
+# specify parameters to track
+params <- c("xi_date_run","omega_date_run","alpha_date_run","sigma_fit","S","RunSize")
+# MCMC settings:
+nc = 2; ni = 10000; nb = 5000; nt = 10
+# Run Gibbs sampler to implement MCMC estimation of the model under Bayesian specification
+# Output true realized run size and estimated run size (i.e. sum of imputed passage + observed passage)
+fit <- bugs(data=win.data,inits=inits, parameters=params,
+model = "skewNormalArrival.NormalErrorProcess.txt", n.thin=nt, n.chains=nc,
+n.burnin=nb, n.iter=ni, debug=F, digits=7, working.directory=getwd() )
+(results <- data.frame(TrueRunSize=sum(real.dat.v,na.rm=T),TotalObsevedPasage=sum(obs.dat.v$Count,na.rm=T),
+EstimatedRunSize=median(fit$sims.list$RunSize,na.rm=T)))
+@
+
+
+\section{Posterior predictive checks}
+
+\section{My opinions and what I learned}
+
+\section{Recommendations}
+
+
+
+  
+
+
+
+\section{References}
+
+
+\noindent Gewin, C.S., and VanHatten, G.K. 2005. Abundance and run timing of adult Pacific Salmon in the East Fork Andreafsky River, Yukon Delta National Wildlife Refuge, Alaska, 2003. U.S. Fish and Wildlife Service Data Series Report 2005-10, Anchorage, Alaska. \\
+
+\noindent Johnson, D.H., Shrier, B.M., O’Neal, J.S., Knutzen, J.A., Augerot, X., O’Neil, T.A., and Pearsons, T.A. (Eds.) 2007. Salmon field protocols handbook. American Fisheries Society, Bethesda, Maryland. \\
+
+\noindent Suresh, Sethi, and Catherine Bradley. "Statistical Arrival Models to Estimate Missed Passage Counts at Fish Weirs." Canadian Journal of Fisheries and Aquatic Sciences. Draft. \\
+
+\noindent   R Core Team (2014). R: A language and environment for statistical
+computing. R Foundation for Statistical Computing, Vienna, Austria. URL
+http://www.R-project.org/.\\
+
+\section{R Code Appendix}
+
+
+
+\end{document}
+
+<<simdat, echo=FALSE>>=
+set.seed(205)
+
+#set values of parameters - done the same way as described in the paper on pg 12
+S <- 10000
+theta <- 7.0
+run.mu <- rnorm(1, 185, sd = 2.5)
+run.sd <- rlnorm(1, log(7.5), sd = log(1.1))
+skew <- -2
+@
+
+\begin{center}
+<<dsn, echo=FALSE, message=FALSE>>=
+#plot run curve with these parameters
+require(sn)
+x <- seq(160, 230, by=0.01)
+plot(x, dsn(x, xi = run.mu, omega = run.sd, alpha = skew), type="l", main="Skew normal run curve")
+#lines(x, dsn(x, psi, omega, alpha=2), col="red", lty=5)
+legend(200, 0.037, c("skew=-2"), lty=c(1), col=c("black"), cex=0.6)
+@
+\end{center}
+
+<<runcurves, echo=FALSE>>=
+
+# calculate p_t, the cumulative prop of the run that has passed weir @ time step t
+p.t.fun <- function(t, run.mu, run.sd, skew) {
+  psn(t, xi = run.mu, omega = run.sd, alpha = skew)
+}
+
+t <- 1:365
+
+p.t <- p.t.fun(t, run.mu, run.sd, skew)
+
+c.t <- numeric(length(t))
+c.t[1] <- p.t[1]
+for(i in 2:length(t)) {
+  c.t[i] <- S*(p.t[i] - p.t[i-1])
+}
+
+#look at p.t and c.t to make sure they worked
+#plot(t, p.t)
+#plot(t, c.t)
+@
+
+<<processvariation, echo=FALSE>>=
+lambda <- theta/(theta + c.t)
+
+c.t.0.fun <- function(lambda, theta) {
+  rnbinom(1, size = theta, prob = lambda)
+}
+
+c.t.0 <- apply(cbind(lambda), 1, c.t.0.fun, theta = theta)
+plot(t, c.t.0, lwd=2)
+lines(t, c.t, lwd=2)
+@
+
+
+
+
+
+
+
+

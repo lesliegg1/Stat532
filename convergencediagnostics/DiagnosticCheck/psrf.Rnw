@@ -1,0 +1,526 @@
+\documentclass[11pt]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% packages
+\usepackage{graphicx} % for pictures
+%\usepackage{fancyhdr} % for headers
+\usepackage{verbatim} % displaying r code
+%\usepackage{fancyvrb}
+\usepackage{setspace} % vspace and hspace
+%\usepackage{listings}
+\usepackage{enumitem} % for [label=]
+\usepackage{amsmath}  % math symbols and such
+%\usepackage{lastpage} % for page numerbering
+\usepackage{color}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% margins
+\setlength{\textwidth}{6.5in}
+\setlength{\textheight}{9in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\evensidemargin}{0in}
+\setlength{\topmargin}{-1.5cm}
+% \def\fs{\footnotesize}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%put%words%in%circle%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage{tikz}
+\usetikzlibrary{shapes.misc,shadows}
+\usetikzlibrary{arrows}
+\usetikzlibrary{shapes}
+\newcommand{\mymk}[1]{%
+  \tikz[baseline=(char.base)]\node[anchor=south west, 
+    draw = blue, rectangle, rounded corners, inner sep=2pt,
+    minimum size=7mm, text height=2mm](char){\ensuremath{#1}} ;}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% title page
+\title{{\bf Potential Scale Reduction Factor ($\widehat{R}$) in} coda}
+\author{as summarized by}
+\date{Matt Tyers, Doug Anderson, and {\color{red}L\color{blue}e\color{orange}s\color{green}l\color{magenta}i\color{cyan}e \color{violet}G\color{lime}a\color{red}i\color{blue}n\color{orange}e\color{green}s\color{magenta}-\color{cyan}G\color{violet}e\color{lime}r\color{red}m\color{blue}a\color{orange}i\color{green}n\color{magenta}e}}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\maketitle
+% \tableofcontents
+% \newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% R code options
+<<setup, include=FALSE, cache=FALSE>>=
+### set default values for code chunks
+opts_chunk$set(
+  echo=FALSE,
+  message=F,
+  warning=F,
+  fig.width=9, 
+  fig.height=6, 
+  out.width='\\linewidth', 
+  dev='pdf', 
+  concordance=TRUE, 
+  results='asis',
+  size = 'small'
+)
+
+### other defaults
+options(
+  replace.assign=TRUE,
+  width=72, 
+  digits = 3, 
+  max.print="72",
+  show.signif.stars = FALSE
+)
+
+### load in necessary packages
+# require(nlme)
+# require(lme4)
+require(xtable)
+# require(ggplot2)
+# require(lattice)
+require(rjags)
+require(R2jags)
+require(rstan)
+# require(mcmcplots)
+require(LearnBayes) 
+### Based on example 3.7 in Carlin & Louis and data from Bliss(1935)
+library(mvtnorm)
+library(coda)
+require(geoR) #for scaled inverse chi squared
+require(rstan)
+
+### set working directory
+setwd("C:/Users/dsand_000/Desktop/Stats/S532/Assignments/DiagnosticCheck")
+@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Background:}
+Calculation of the potential scale reduction factor (psrf), or $\widehat{R}$, using \verb|gelman.diag()| via the R package \verb|coda| uses the within-chain variance ($W$) and between-chain variance $B$ employed in the Gelman et. al text (though without splitting the chains), but uses them differently, and allows for multivariate chains.
+
+The function \verb|gelman.diag()| requires the input to be a mcmc object, and allows the user to specify whether to use a transformation on the chain, whether to accept an ``auto-burnin'', whether the chains are to be considered multivariate, and a confidence level for the upper CI limit reported.
+
+If the ``auto-burnin'' is accepted, \verb|gelman.diag()| discards the first half of the chains as burnin, otherwise, the full chains are retained. It then extracts the number of iterations, the number of chains, the number of variables used, and the variable names from the mcmc object, and then converts the mcmc object to a matrix. It then computes the variance of each chain $s_j^2$, average within-chain variance $W$, and between-chain variance $B$, using the same calculations as given in Gelman, et. al. However, $s_j^2$, $W$, and $B$ ar stored as vectors with a value for each variable in the mcmc object the function is given. In the non-multivariate case, it generates diagonal matrixes $s2$, $w$, and $b$ for each, and all subsequent calculations are done using these matrices, which cuts down on processing time. 
+
+<<psrf1, cache=TRUE>>=
+## Example code comes from
+## http://www.johnmyleswhite.com/notebook/2010/08/20/using-jags-in-r-with-the-rjags-package/
+
+## saving JAGs model as a .txt file
+# cat("
+#     model {
+#       for (i in 1:n) {
+#         y[i] ~ dbern(p[i])
+#         p[i] <- 1 / (1 + exp(-z[i]))
+# 		    z[i] <- a + b * x[i]
+#       }
+#       
+# 	    a ~ dnorm(0, .0001)
+# 	    b ~ dnorm(0, .0001)
+#     }", file="psrf_bern.txt")
+## fake data
+N <- 1000
+x.vec <- 1:N
+z.vec <- 0.01 * x.vec - 5
+p.vec <- 1 / (1 + exp(-z.vec))
+set.seed(34)
+y.vec <- sapply(p.vec, function(p) {rbinom(1, 1, p)})
+## glm fit in glm()
+# glm.fake <- glm(y.vec ~ x.vec, family=binomial(link = "logit"))
+## data to pass to JAGS
+# d.list <- list(y = y.vec, 
+#                x = x.vec, 
+#                n = length(y.vec))
+## parameters to obtain from JAGs
+# p.list <- c("a","b")
+## warmup
+# warmup <- jags.model(data=d.list, 
+#                      file="psrf_bern.txt",
+#                      n.chains=4,
+#                      n.adapt=200,
+#                      quiet=T)
+## sampling after completed warmup
+# samps <- coda.samples(warmup, p.list, n.iter=1000, quiet=T)
+## write to text file
+# mcmc.samps1 <- as.mcmc(samps[[1]])
+# write.csv(mcmc.samps1, "psrf_samps1.csv")
+# mcmc.samps2 <- as.mcmc(samps[[2]])
+# write.csv(mcmc.samps2, "psrf_samps2.csv")
+# mcmc.samps3 <- as.mcmc(samps[[3]])
+# write.csv(mcmc.samps3, "psrf_samps3.csv")
+# mcmc.samps4 <- as.mcmc(samps[[4]])
+# write.csv(mcmc.samps4, "psrf_samps4.csv")
+## read from text files
+samp1 <- read.csv("psrf_samps1.csv", header=T)
+samp2 <- read.csv("psrf_samps2.csv", header=T)
+samp3 <- read.csv("psrf_samps3.csv", header=T)
+samp4 <- read.csv("psrf_samps4.csv", header=T)
+## convert each to an mcmc object and then mcmc.list 
+samps <- mcmc.list(mcmc(samp1[,-1]),mcmc(samp2[,-1]),
+                   mcmc(samp3[,-1]),mcmc(samp4[,-1]))
+@
+
+<<psrf2>>=
+# plot(samps)
+rhat <- gelman.diag(samps)
+# summary(samps)
+
+## compute psi_bar.j for a (intercept)
+n <- 1000 # one-thousand iterations in each chain
+psi_bar.1 <- (1/n) * sum(samp1[,2]) # chain 1, intercept
+psi_bar.2 <- (1/n) * sum(samp2[,2]) # chain 2, intercept
+psi_bar.3 <- (1/n) * sum(samp3[,2]) # chain 3, intercept
+psi_bar.4 <- (1/n) * sum(samp4[,2]) # chain 4, intercept
+psi_bar.j <- c(psi_bar.1, psi_bar.2, psi_bar.3, psi_bar.4)
+
+## compute psi_bar..
+m <- 4 ## four chains
+psi_bar.. <- ( 1/m ) * sum( psi_bar.j )
+
+## Compute B (between-chain variance)
+B <- ( n/(m-1) ) * sum( (psi_bar.j - psi_bar..)^2 )
+
+## compute s_j_sq
+s_1_sq <- ( 1/(n-1) ) * sum( (samp1[,2] - psi_bar.1)^2 )
+s_2_sq <- ( 1/(n-1) ) * sum( (samp2[,2] - psi_bar.2)^2 )
+s_3_sq <- ( 1/(n-1) ) * sum( (samp3[,2] - psi_bar.3)^2 )
+s_4_sq <- ( 1/(n-1) ) * sum( (samp4[,2] - psi_bar.4)^2 )
+s_j_sq <- c(s_1_sq, s_2_sq, s_3_sq, s_4_sq)
+
+## Compute W (within-chain variance)
+W <- ( 1/m ) * sum( s_j_sq )
+
+## compute sigma_hat_sq
+sigma_hat_sq <- ( (n-1)/n ) * W + ( 1/n ) * B
+
+
+
+#### Compute R-hat from BDA3 text
+Rhat_BDA3 <- sqrt( sigma_hat_sq / W )
+
+
+
+#### Compute R-hat from coda package
+## compute the variance 
+V_hat_coda <- sigma_hat_sq + (B / ( m*n ))
+
+## compute variance of V_hat
+var_V_hat_1_coda <- ((n-1)/n)^2 * (1/m) * var(s_j_sq)
+var_V_hat_2_coda <- (1/n)^2 * (2/(m-1)) * B^2
+var_V_hat_3_coda <- 2 * ((n-1)/n^2) * (n/m) * 
+                  ( cov(s_j_sq,psi_bar.j^2) - 
+                    2 * psi_bar.. * cov(s_j_sq,psi_bar.j) )
+var_V_hat_coda <- var_V_hat_1_coda + var_V_hat_2_coda + 
+                      var_V_hat_3_coda
+  
+## compute the degrees estimated by the method of moments
+d_coda <- 2 * V_hat_coda^2 / var_V_hat_coda
+
+## compute Rhat
+Rhat_coda <- sqrt( ((d_coda+3) * V_hat_coda) / ((d_coda+1) * W) )
+
+
+
+#### SAS
+## compute the variance 
+V_hat_SAS <- ((n-1)/n) * W + ( (m+1)/(m*n) ) * B
+
+## compute variance of V_hat
+var_V_hat_1_SAS <- ( (n-1)/n )^2 * (1/m) * var(s_j_sq)
+var_V_hat_2_SAS <- ( (m+1)/(m*n) )^2 * (2/(m-1)) * B^2
+var_V_hat_3_SAS <- 2 * ( (m+1)*(n-1)/(m*n^2) ) * (n/m) * 
+                ( cov(s_j_sq,psi_bar.j^2) - 
+                  2 * psi_bar.. * cov(s_j_sq,psi_bar.j) )
+var_V_hat_SAS <- var_V_hat_1_SAS + var_V_hat_2_SAS + var_V_hat_3_SAS
+  
+## compute the degrees estimated by the method of moments
+d_SAS <- 2 * V_hat_SAS^2 / var_V_hat_SAS
+
+## compute Rhat
+Rhat_sas <- sqrt( ((d_SAS+3) * V_hat_SAS) / ((d_SAS+1) * W) )
+
+
+
+## matt Tyers
+var.s.sq <- var(s_j_sq)
+cov.WB <- (n/m)*(var(s_j_sq, psi_bar.j^2) - 2*psi_bar..*var(s_j_sq,psi_bar.j))
+var.B <- 2*B^2/(m-1)
+var.W <- var.s.sq/m
+var.V.num <- (n-1)^2*var.W + (1+1/m)^2*var.B + 2*(n-1)*(1+1/m)*cov.WB
+var.V.den <- n^2
+var.V <- var.V.num / var.V.den
+V <- ((n-1)/n)*W + ((1+(1/m))/n)*B
+df.V <- 2*V^2/var.V
+df.adj <- (df.V + 3) / (df.V + 1)
+R.random.sq <- (1+1/m) * (1/n) * (B/W)
+R.fixed.sq <- (n-1)/n
+R.est.sq <- R.fixed.sq + R.random.sq
+psrf <- (sqrt(df.adj * R.est.sq))
+
+@
+
+\section{The Steps (with R code):}
+The steps that we used on 4 chains of 1000 iterations where each chain is stored in a $1\times 2$ matrix called \verb|samp#|. (We focused on the second parameter.)
+\begin{enumerate}
+\item We will begin with calculating the between-chain variance $B$ as outlined by Gelman et. al. in BDA3 ($m$ is the number of chains, $n$ is the number of iterations per chain):
+{\color{blue} 
+\begin{equation*}
+\begin{split}
+B & = \frac{n}{m-1}\sum_{j=1}^m (\overline{\psi}_{.j} - \overline{\psi}_{..})^2, \hspace{0.3cm} \text{where}\\
+\overline{\psi}_{.j} & = \frac{1}{n} \sum_{i=1}^n \psi_{ij}\\
+\overline{\psi}_{..} & = \frac{1}{m} \sum_{j=1}^m \overline{\psi}_{.j}
+\end{split}
+\end{equation*}
+}
+Using R, this is done by
+{\color{red} 
+\begin{verbatim}
+n <- 1000 # one-thousand iterations in each chain
+m <- 4 ## four chains
+    psi_bar.1 <- (1/n) * sum(samp1[,2]) # chain 1, parameter of choice 
+    psi_bar.2 <- (1/n) * sum(samp2[,2]) # chain 2, parameter of choice 
+    psi_bar.3 <- (1/n) * sum(samp3[,2]) # chain 3, parameter of choice
+    psi_bar.4 <- (1/n) * sum(samp4[,2]) # chain 4, parameter of choice
+  psi_bar.j <- c(psi_bar.1, psi_bar.2, psi_bar.3, psi_bar.4)
+## Compute psi_bar..
+  psi_bar.. <- ( 1/m ) * sum( psi_bar.j )
+## Compute B (between-chain variance)
+  B <- ( n/(m-1) ) * sum( (psi_bar.j - psi_bar..)^2 )
+\end{verbatim}
+}
+
+\item Next, compute the the within-chain variance $W$ as outlined in BDA3:
+{\color{blue} 
+\begin{equation*}
+\begin{split}
+W & = \frac{1}{m}\sum_{j=1}^m s_j^2, \hspace{0.3cm} \text{where}\\
+s_j^2 & = \frac{1}{n-1} \sum_{i=1}^n (\psi_{ij} - \overline{\psi}_{.j})^2
+\end{split}
+\end{equation*}
+}\vspace{-0.7cm}
+{\color{red} 
+\begin{verbatim}
+## Compute s_j_sq
+    s_1_sq <- ( 1/(n-1) ) * sum( (samp1[,2] - psi_bar.1)^2 )
+    s_2_sq <- ( 1/(n-1) ) * sum( (samp2[,2] - psi_bar.2)^2 )
+    s_3_sq <- ( 1/(n-1) ) * sum( (samp3[,2] - psi_bar.3)^2 )
+    s_4_sq <- ( 1/(n-1) ) * sum( (samp4[,2] - psi_bar.4)^2 )
+  s_j_sq <- c(s_1_sq, s_2_sq, s_3_sq, s_4_sq)
+## Compute W (within-chain variance)
+  W <- ( 1/m ) * sum( s_j_sq )
+## Compute sigma_hat_sq
+  sigma_hat_sq <- ( (n-1)/n ) * W + ( 1/n ) * B
+\end{verbatim}
+}
+
+\item Next is to calculate what Gelman et. al. call $\widehat{\text{var}}^+(\psi|y)$ or the \verb|coda| package refers to as \verb|sigma.hat^2| (or $\widehat{\sigma}^2$):
+{\color{blue} 
+$$\widehat{\text{var}}^+(\psi|y) = \frac{n-1}{n}W + \frac{1}{n}B$$
+}\vspace{-0.7cm}
+{\color{red} 
+\begin{verbatim}
+  sigma_hat_sq <- ( (n-1)/n ) * W + ( 1/n ) * B
+\end{verbatim}
+}
+
+\item Calculate $\widehat{R}$:
+  \begin{enumerate}
+  \item In BDA3 there is only one more step required
+{\color{blue}
+$$\widehat{R} = \sqrt{\frac{\widehat{\text{var}}^+(\psi|y)}{W}}$$
+}\vspace{-0.7cm}
+{\color{red}
+\begin{verbatim}
+  Rhat_BDA3 <- sqrt( sigma_hat_sq / W )
+\end{verbatim}
+}
+  \item The \verb|coda| package does things slightly different
+    \begin{enumerate}
+    \item Compute what the authors call \verb|V.hat|:
+{\color{blue}
+$$\widehat{V} = \widehat{\sigma}^2 + \frac{B}{mn}$$
+}    \vspace{-0.5cm}
+{\color{red}
+\begin{verbatim}
+V_hat_coda <- sigma_hat_sq + (B / ( m*n ))
+\end{verbatim}
+}
+    \item Calculate the degrees of freedom estimated by the method of moments. (Here I have followed mostly how SAS estimates $d$ (similar to Matt.)
+{\color{blue}
+\begin{equation*}
+\begin{split}
+\widehat{d} & = \frac{2\widehat{V}^2}{\widehat{\text{var}}(\widehat{V})}, \hspace{0.3cm} \text{where}\\
+\widehat{\text{var}}(\widehat{V}) & = \left(\frac{n-1}{n}\right)^2\text{var}(W) + \left(\frac{1}{n}\right)^2\text{var}(B) + 2\left(\frac{n-1}{n^2}\right)\text{cov}(W,B)\\
+\text{var}(W) & = \frac{1}{m}\text{var}(s_j^2)\\
+\text{var}(B) & = \frac{2B^2}{m-1}\\
+\text{cov}(W,B) & = \left(\frac{n}{m}\right)\left[\text{cov}(s_j^2,\overline{\psi}_{.j}^2) - 2\overline{\psi}_{..}\text{cov}(s_j^2,\overline{\psi}_{.j})\right]
+\end{split}
+\end{equation*}
+}    \vspace{-0.5cm}
+{\color{red}
+\begin{verbatim}
+## compute variance of V_hat
+var_V_hat_1_coda <- ((n-1)/n)^2 * (1/m) * var(s_j_sq)
+var_V_hat_2_coda <- (1/n)^2 * (2/(m-1)) * B^2
+var_V_hat_3_coda <- 2 * ((n-1)/n^2) * (n/m) * 
+                      ( cov(s_j_sq,psi_bar.j^2) - 
+                        2 * psi_bar.. * cov(s_j_sq,psi_bar.j) )
+var_V_hat_coda <- var_V_hat_1_coda + var_V_hat_2_coda + 
+                      var_V_hat_3_coda
+## compute the degrees estimated by the method of moments
+d_coda <- 2 * V_hat_coda^2 / var_V_hat_coda
+\end{verbatim}
+}
+    \item Calculate $\widehat{R}$ as the \verb|coda| package instructs:
+{\color{blue}
+$$\widehat{R} = \sqrt{\left(\frac{\widehat{d}+3}{\widehat{d}+1}\right)\frac{\widehat{V}}{W}}$$
+}  \vspace{-0.5cm}
+{\color{red}
+\begin{verbatim}
+Rhat_coda <- sqrt( ((d_coda+3) * V_hat_coda) / ((d_coda+1) * W) )  
+\end{verbatim}
+}
+    \end{enumerate}
+    
+  \item The code above, if implemented, does not yield the exact results of the function \verb|gelman.diag()| but is close. Perhaps, how Matt outlined previously (how SAS computes $\widehat{R}$) is how the package calculates $\widehat{R}$.
+    \begin{enumerate}
+    \item Compute $\widehat{V}$:
+{\color{blue}
+$$\widehat{V} = \frac{n-1}{n}W + \frac{m+1}{mn}B$$
+}    \vspace{-0.5cm}
+{\color{red}
+\begin{verbatim}
+V_hat_SAS <- ((n-1)/n) * W + ( (m+1)/(m*n) ) * B
+\end{verbatim}
+} 
+    \item Compute $\widehat{d}$ (there are subtle differences between this method and the previous method):
+{\color{blue}
+\begin{equation*}
+\begin{split}
+\widehat{d} & = \frac{2\widehat{V}^2}{\widehat{\text{var}}(\widehat{V})}, \hspace{0.3cm} \text{where}\\
+\widehat{\text{var}}(\widehat{V}) & = \left(\frac{n-1}{n}\right)^2\text{var}(W) + \left(\frac{m+1}{mn}\right)^2\text{var}(B) + 2\left(\frac{(m+1)(n-1)}{mn^2}\right)\text{cov}(W,B)\\
+\text{var}(W) & = \frac{1}{m}\text{var}(s_j^2)\\
+\text{var}(B) & = \frac{2B^2}{m-1}\\
+\text{cov}(W,B) & = \left(\frac{n}{m}\right)\left[\text{cov}(s_j^2,\overline{\psi}_{.j}^2) - 2\overline{\psi}_{..}\text{cov}(s_j^2,\overline{\psi}_{.j})\right]
+\end{split}
+\end{equation*}
+}        
+    
+{\color{red}
+\begin{verbatim}
+## compute variance of V_hat
+var_V_hat_1_SAS <- ( (n-1)/n )^2 * (1/m) * var(s_j_sq)
+var_V_hat_2_SAS <- ( (m+1)/(m*n) )^2 * (2/(m-1)) * B^2
+var_V_hat_3_SAS <- 2 * ( (m+1)*(n-1)/(m*n^2) ) * (n/m) * 
+                     ( cov(s_j_sq,psi_bar.j^2) - 
+                       2 * psi_bar.. * cov(s_j_sq,psi_bar.j) )
+var_V_hat_SAS <- var_V_hat_1_SAS + var_V_hat_2_SAS + var_V_hat_3_SAS
+## compute the degrees estimated by the method of moments
+d_SAS <- 2 * V_hat_SAS^2 / var_V_hat_SAS
+\end{verbatim}
+} 
+    \item Calculate $\widehat{R}$:
+{\color{blue}
+$$\widehat{R} = \sqrt{\left(\frac{\widehat{d}+3}{\widehat{d}+1}\right)\frac{\widehat{V}}{W}}$$    
+}
+{\color{red}
+\begin{verbatim}
+Rhat_sas <- sqrt( ((d_SAS+3) * V_hat_SAS) / ((d_SAS+1) * W) )
+\end{verbatim}
+}    
+    \end{enumerate}
+    
+  \end{enumerate}
+\end{enumerate}
+
+\section{Warning and Upper Bound:}
+Following any of these procedures does not yield results perfectly matching the output obtained from using \verb|gelman.diag()| function in \verb|coda|: \verb|gelman.diag()|=1.033328, $\widehat{R}_{BDA3}=1.023483$, $\widehat{R}_{coda}=1.032407$, and $\widehat{R}_{SAS}=1.032702$ were estimates we found using fake data and \verb|coda| output. However, the method used by SAS yielded the closest results. An upper $100(1-\alpha/2)\%$ confidence limit for $\widehat{R}$ can be computed by ($\widehat{d}$ should be consistent from previous calculations):
+
+\begin{enumerate}
+\item SAS method (and Matt):
+{\color{blue}
+$$\sqrt{\left(\frac{n-1}{n}+ \frac{m+1}{mn}\cdot F_{1-\alpha/2}\left(m-1,\frac{2W^2}{\widehat{\text{var}}(s_j^2)/m}\right)\right)\left(\frac{\widehat{d}+3}{\widehat{d}+1}\right)}$$
+}
+
+\item \verb|coda| method (we are guessing here):
+{\color{blue}
+$$\sqrt{\left(\frac{n-1}{n}+ \frac{1}{n}\cdot F_{1-\alpha/2}\left(m-1,\frac{2W^2}{\widehat{\text{var}}(s_j^2)/m}\right)\right)\left(\frac{\widehat{d}+3}{\widehat{d}+1}\right)}$$
+}
+
+\end{enumerate}
+
+% using the following fake data
+% {\color{red} 
+% \begin{verbatim}
+% N <- 1000
+% x.vec <- 1:N
+% z.vec <- 0.01 * x.vec - 5
+% p.vec <- 1 / (1 + exp(-z.vec))
+% set.seed(34)
+% y.vec <- sapply(p.vec, function(p) {rbinom(1, 1, p)})
+% \end{verbatim}  
+% }
+% using 4 chains of 1000 iteration each in the model (after a warmup of 200 iterations)
+% {\color{red} 
+% \begin{verbatim}
+% model {
+%   for (i in 1:n) {
+%     y[i] ~ dbern(p[i])
+%     p[i] <- 1 / (1 + exp(-z[i]))
+%     z[i] <- a + b * x[i]
+%   }
+% 
+%   a ~ dnorm(0, .0001)
+%   b ~ dnorm(0, .0001) 
+% }
+% \end{verbatim}
+% }
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% R Appendix
+% \singlespacing
+
+% \pagebreak
+
+% \section{R Code Appendix}
+
+% 
+% <<setup, eval=FALSE, echo=TRUE>>=
+% @
+% \subsection{Code from Part (a)}
+% <<prob1ai, eval=FALSE, echo=TRUE>>=
+% @
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% for a figure use
+% \begin{figure}[h!]
+% \centering
+% <<graph, results='asis', fig=TRUE, echo=FALSE, fig.width=9, fig.height=6, out.width="\\linewidth">>=
+% 
+% @
+% \caption{{\it }}
+% \end{figure}
+
+% or
+
+% \begin{figure}[h!]
+% \centering
+% \includegraphics[width=0.95\linewidth]{s528hw5_1uchart.png}
+% % \caption{{\it }}
+% \end{figure}
+
+% or for side by side
+
+% \begin{figure}[h!]
+% \centering
+% \begin{minipage}{.5\textwidth}
+%   \centering
+%   \includegraphics[width=0.95\linewidth]{s528hw4_7a.png}
+% \end{minipage}%
+% \begin{minipage}{.5\textwidth}
+%   \centering
+%   \includegraphics[width=0.95\linewidth]{s528hw4_7d.png}
+% \end{minipage}
+% \end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
